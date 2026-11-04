@@ -1,0 +1,527 @@
+/* ------------------------------------------------------------------
+   Tamira — hero
+   Day → night is driven by one variable, --night (0 → 1), set from scroll.
+   ------------------------------------------------------------------ */
+
+:root {
+  --red: #ea3c32;          /* wordmark + contact accent (sampled from the reference) */
+  --day-bg: #ffffff;
+  --night-bg: #1d222c;     /* matches the night render's edges so the video fades in seamlessly */
+  --day-ink: #000000;
+  --night-ink: #f3f1ee;
+
+  /* page colour and ink are set from scroll (src/story/palette.js): white → dusk → navy → lavender */
+  --bg: var(--day-bg);
+  --ink: var(--day-ink);
+  --ink-soft: color-mix(in oklab, var(--ink), transparent 30%);
+  --wire-bg: #e4e4ee;
+
+  /* Grid: one centred container, 84rem of content, on a 4px spacing base.
+     Side padding is 20px, 48px from 1024px up. --page-x is the padding that
+     keeps content inside the container on any width, so full-bleed blocks
+     (header, hero) can align to the grid without an extra wrapper. */
+  --space: 0.25rem;
+  --container: 84rem;
+  --pad-x: calc(var(--space) * 5);
+  --page-x: max(var(--pad-x), calc((100% - var(--container)) / 2));
+  --header-height: 4rem;
+  --indent: 0px;                   /* hero copy sits one step in from the grid on desktop */
+
+  /* Type scale: every size runs linearly from a 480px to a 1280px viewport, then holds. */
+  --text-display: clamp(2.25rem, 1.5rem + 2.5vw, 3.5rem);        /* 36 → 56 */
+  --text-heading-48: clamp(1.75rem, 1rem + 2.5vw, 3rem);         /* 28 → 48 */
+  --text-heading-40: clamp(1.625rem, 1.1rem + 1.75vw, 2.5rem);   /* 26 → 40 */
+  --text-body-20: clamp(1.0625rem, 0.95rem + 0.375vw, 1.25rem);  /* 17 → 20 */
+  --text-body-18: clamp(1rem, 0.925rem + 0.25vw, 1.125rem);      /* 16 → 18 */
+  --text-body-15: 0.9375rem;
+  --text-nav: clamp(0.875rem, 0.8375rem + 0.125vw, 0.9375rem);   /* 14 → 15 */
+
+  --leading-display: 1.1;          /* 0.98 from 768px */
+  --leading-heading: 1.1;          /* 1.05 from 768px */
+  --leading-body: 1.5;
+  --leading-body-20: 1.3;
+  --leading-nav: 1.2;
+  --tracking-heading: -0.03em;
+  --tracking-small: 0.01em;
+  --radius-xs: 2px;
+
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-wordmark: "Quicksand", ui-rounded, system-ui, sans-serif;
+
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: inherit; text-decoration: none; }
+
+:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 6px;
+  transform: translateY(-150%);
+  transition: transform 160ms var(--ease-out-quint);
+}
+.skip-link:focus-visible { transform: none; }
+
+/* ------------------------------------------------------------------ header */
+
+/* Wordmark and nav sit together on the left; "Contact us" is pushed to the far right. */
+.site-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 16);
+  height: var(--header-height);
+  padding-inline: var(--page-x);
+  pointer-events: none;            /* only the links/buttons take clicks */
+}
+.site-header > * { pointer-events: auto; }
+
+.wordmark {
+  flex-shrink: 0;
+  font-family: var(--font-wordmark);
+  font-weight: 600;
+  font-size: 1.75rem;              /* ~102px wide, the same footprint at every size */
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--red);
+  /* optical: rounded caps sit slightly high next to the nav baseline */
+  padding-block: 2px 4px;
+}
+
+.primary-nav { flex: 1; }
+
+.nav-list {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nav-list li:last-child { margin-left: auto; }
+
+.nav-list a {
+  position: relative;
+  display: inline-block;
+  padding-block: var(--space);
+  font-size: var(--text-nav);
+  font-weight: 400;
+  line-height: var(--leading-nav);
+  color: var(--ink);
+  transition-property: opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+/* 40px minimum hit area without changing the visual size */
+.nav-list a::after {
+  content: "";
+  position: absolute;
+  inset: 50% -8px auto -8px;
+  height: 44px;
+  transform: translateY(-50%);
+}
+/* outlined rather than filled: white on this red is under 4.5:1 at nav size */
+.nav-list .nav-contact {
+  padding: 0.5625rem 0.875rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-xs);
+  color: var(--red);
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav-list a:hover { opacity: 0.6; }
+}
+
+.menu-toggle {
+  display: none;
+  position: relative;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 500 1rem/1 var(--font-sans);
+  cursor: pointer;
+  transition-property: scale;
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
+}
+.menu-toggle:active { scale: 0.97; }
+
+/* ------------------------------------------------------------------ hero */
+
+/* the whole story scrolls past one pinned stage; its length comes from src/story/timeline.js */
+.story {
+  position: relative;
+  height: calc(var(--story-screens, 1) * 100svh);
+}
+
+.story__stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.story__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  z-index: 1;
+}
+.story__canvas--wire { visibility: hidden; }   /* above the city canvas (later in the DOM) */
+
+.hero__stage {
+  /* the city fills the right of the frame; the headline sits bottom-left */
+  position: absolute;
+  top: var(--header-height);
+  right: 0;
+  bottom: 0;
+  left: clamp(0px, 20vw, 360px);
+  /* fade into the page at the top, and away from the bottom-left corner where the headline sits */
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0%, #000 28%),
+    linear-gradient(to right, transparent 0%, #000 30%),
+    linear-gradient(to top right, transparent 0%, transparent 12%, #000 48%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to bottom, transparent 0%, #000 28%),
+    linear-gradient(to right, transparent 0%, #000 30%),
+    linear-gradient(to top right, transparent 0%, transparent 12%, #000 48%);
+  mask-composite: intersect;
+}
+
+.hero__poster,
+.hero__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 58%;
+}
+.hero__video { opacity: 0; }       /* shown once it can seek */
+.hero__video.is-ready { opacity: 1; }
+
+/* Copy is anchored to the bottom of the frame, on the grid, one indent step in on desktop. */
+.hero__copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  padding-top: var(--header-height);
+  padding-bottom: calc(var(--space) * 10);
+  padding-inline: calc(var(--page-x) + var(--indent)) var(--page-x);
+}
+
+.hero__title {
+  margin: 0;
+  max-width: 56rem;
+  font-weight: 400;                /* lightest weight Instrument Sans ships */
+  font-size: var(--text-display);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-heading);
+  color: var(--ink);
+  text-wrap: balance;
+}
+/* the tight leading would clip descenders inside the reveal mask; pad the mask, pull the next line back */
+.hero__title .line { display: block; overflow: hidden; padding-bottom: 0.14em; margin-bottom: -0.14em; }
+.hero__title .line__inner { display: inline-block; }
+
+/* ------------------------------------------------------------------ wire chapters
+   Copy always sits in the left column, upper part of the frame; the wire works on the right. */
+
+.story__copy { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+
+.chapter {
+  position: absolute;
+  top: calc(var(--header-height) + clamp(24px, 7svh, 88px));
+  left: calc(var(--page-x) + var(--indent));
+  width: min(31rem, calc(100% - 2 * var(--page-x)));
+  visibility: hidden;
+  opacity: 0;
+}
+.chapter__title {
+  margin: 0;
+  font-weight: 400;
+  font-size: var(--text-heading-40);
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+.chapter__body {
+  margin: calc(var(--space) * 4) 0 0;
+  max-width: 27rem;
+  font-size: var(--text-body-18);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+.chapter__proof {
+  margin: calc(var(--space) * 4) 0 0;
+  max-width: 27rem;
+  font-size: var(--text-body-15);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-small);
+  color: color-mix(in oklab, var(--ink), transparent 45%);
+  font-variant-numeric: tabular-nums;
+}
+
+/* labels pinned to points on the wire (positioned from JS) */
+.story__labels { position: absolute; inset: 0; z-index: 3; pointer-events: none; visibility: hidden; }
+.label { position: absolute; left: 0; top: 0; will-change: transform; }
+.label__pin {
+  position: absolute;
+  left: -4px; top: -4px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--bg), transparent 20%);
+}
+.label__pin::after {             /* leader line up to the tag */
+  content: "";
+  position: absolute;
+  left: 3.5px; bottom: 8px;
+  width: 1px; height: 56px;
+  background: color-mix(in oklab, var(--ink), transparent 55%);
+}
+.label__tag {
+  position: absolute;
+  left: 12px; bottom: 52px;
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px 7px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--bg), transparent 8%);   /* stays legible over copper and print */
+  white-space: nowrap;
+}
+.label__k { font-size: 0.8125rem; letter-spacing: var(--tracking-small); color: color-mix(in oklab, var(--ink), transparent 45%); }
+.label__v { font-size: var(--text-body-15); color: var(--ink); }
+
+/* temperature gauge (heat chapter) */
+.gauge {
+  position: absolute;
+  z-index: 3;
+  right: var(--page-x);
+  bottom: clamp(32px, 9svh, 96px);
+  width: min(22rem, calc(100% - 2 * var(--page-x)));
+  display: grid;
+  gap: calc(var(--space) * 2);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.gauge__k { font-size: 0.8125rem; letter-spacing: var(--tracking-small); color: var(--ink-soft); }
+.gauge__v { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+.gauge__n { font-size: var(--text-heading-48); line-height: 1; letter-spacing: var(--tracking-heading); }
+.gauge__u { font-size: var(--text-body-18); color: var(--ink-soft); }
+.gauge__scale {
+  position: relative;
+  height: 2px;
+  margin-top: calc(var(--space) * 3);
+  margin-bottom: calc(var(--space) * 8);
+  background: color-mix(in oklab, var(--ink), transparent 82%);
+}
+.gauge__fill {
+  position: absolute; inset: 0;
+  background: var(--ink);
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+.gauge.is-past .gauge__fill { background: #e0601a; }
+.gauge__tick { position: absolute; top: -5px; width: 1px; height: 12px; background: var(--ink-soft); }
+.gauge__tick span {
+  position: absolute;
+  top: 18px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+.gauge__tick.is-rated { background: #e0601a; }
+.gauge__tick.is-rated span { color: #c24f12; }
+
+/* ------------------------------------------------------------------ end */
+
+.end {
+  position: relative;
+  z-index: 1;
+  padding: clamp(96px, 18svh, 200px) calc(var(--page-x) + var(--indent)) clamp(96px, 16svh, 180px) ;
+  background: var(--bg);
+}
+.end__title {
+  margin: 0;
+  max-width: 40rem;
+  font-weight: 400;
+  font-size: var(--text-heading-48);
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+.end__body {
+  margin: calc(var(--space) * 5) 0 0;
+  max-width: 32rem;
+  font-size: var(--text-body-18);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+}
+.end__cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: calc(var(--space) * 8);
+  padding: 0 calc(var(--space) * 5);
+  border-radius: var(--radius-xs);
+  background: var(--red);
+  color: #fff;
+  font-size: var(--text-nav);
+  font-weight: 500;              /* white on this red needs the heavier weight */
+  transition-property: opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .end__cta:hover { opacity: 0.86; }
+}
+
+/* ------------------------------------------------------------------ static story (reduced motion / no WebGL) */
+
+.story.is-static { height: auto; }
+.is-static .site-header { background: var(--bg); }   /* content scrolls under it in the static layout */
+.story.is-static .story__stage { position: relative; height: auto; overflow: visible; }
+.story.is-static .hero__stage { position: relative; inset: auto; height: 70svh; margin-top: var(--header-height); }
+.story.is-static .story__canvas,
+.story.is-static .story__labels,
+.story.is-static .gauge { display: none; }
+.story.is-static .hero__copy { height: auto; padding-top: calc(var(--space) * 8); }
+.story.is-static .story__copy { position: relative; inset: auto; padding: 0 var(--page-x); }
+.story.is-static .chapter {
+  position: relative; top: auto; left: auto;
+  width: auto;
+  padding: calc(var(--space) * 16) var(--indent) 0;
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ grid steps */
+
+@media (min-width: 640px) {
+  :root { --header-height: 5.375rem; }
+  .hero__copy { padding-bottom: calc(var(--space) * 12); }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --leading-display: 0.98;
+    --leading-heading: 1.05;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --pad-x: calc(var(--space) * 12);
+    --indent: calc(var(--space) * 13);
+  }
+  .hero__copy { padding-bottom: calc(var(--space) * 24); }
+}
+
+/* ------------------------------------------------------------------ small screens */
+
+@media (max-width: 1023px) {
+  .primary-nav { display: flex; justify-content: flex-end; }
+  .menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+
+  .nav-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: var(--page-x);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 200px;
+    padding: 12px 18px;
+    border-radius: 14px;
+    background: color-mix(in oklab, var(--bg), transparent 4%);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--ink), transparent 90%),
+      0 12px 32px -12px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    translate: 0 -6px;
+    visibility: hidden;
+    transition-property: opacity, translate, visibility;
+    transition-duration: 200ms, 200ms, 0s;
+    transition-delay: 0s, 0s, 200ms;
+    transition-timing-function: var(--ease-out-quint);
+  }
+  .nav-list a { padding-block: 8px; }
+  .nav-list li:last-child { margin-left: 0; }
+  .nav-list .nav-contact { padding: 8px 0; border: 0; }
+  .primary-nav.is-open .nav-list {
+    opacity: 1;
+    translate: 0 0;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+}
+
+/* phones and small tablets: the city sits above, the headline below it */
+@media (max-width: 860px) {
+  .hero__stage {
+    left: 0;
+    bottom: auto;
+    height: 70svh;
+    -webkit-mask-image:
+      linear-gradient(to bottom, transparent 0%, #000 18%, #000 74%, transparent 100%);
+    mask-image:
+      linear-gradient(to bottom, transparent 0%, #000 18%, #000 74%, transparent 100%);
+  }
+  .hero__poster, .hero__video { object-position: 50% 60%; }
+}
+
+/* ------------------------------------------------------------------ reduced motion: static day frame, no transitions */
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link,
+  .nav-list a,
+  .menu-toggle,
+  .nav-list { transition: none; }
+  .hero__video { display: none; }
+}

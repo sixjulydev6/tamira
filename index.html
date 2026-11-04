@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tamira — Good wiring is the kind you never think about</title>
+  <meta name="description" content="Tamira makes wiring and cable for homes, industry and infrastructure.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&family=Quicksand:wght@600&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="/media/hero-day.jpg">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" data-reveal="header">
+    <a class="wordmark" href="/" aria-label="Tamira home">Tamira</a>
+
+    <nav class="primary-nav" aria-label="Primary">
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-list">
+        <span class="menu-toggle__label">Menu</span>
+      </button>
+      <ul id="nav-list" class="nav-list">
+        <li><a href="#consumers">Consumers</a></li>
+        <li><a href="#industries">Industries</a></li>
+        <li><a href="#investors">Investors</a></li>
+        <li><a href="#company">Company</a></li>
+        <li><a class="nav-contact" href="#contact">Contact us</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main">
+    <!-- The story: one pinned stage. The day city turns into a wireframe network on the first
+         scroll; the wire runs through it lighting the city, the camera pushes in, the city drains
+         into the wire's tip, and the wire tells its own story on a light page. -->
+    <section class="story" aria-labelledby="hero-title">
+      <div class="story__stage">
+        <div class="hero__stage" aria-hidden="true">
+          <img class="hero__poster" src="/media/hero-day.jpg" alt="" width="1920" height="1080" decoding="async" fetchpriority="high">
+        </div>
+
+        <canvas class="story__canvas" aria-hidden="true"></canvas>
+        <canvas class="story__canvas story__canvas--wire" aria-hidden="true"></canvas>
+
+        <div class="hero__copy">
+          <h1 id="hero-title" class="hero__title">
+            <span class="line"><span class="line__inner">Good wiring is the kind</span></span>
+            <span class="line"><span class="line__inner">you never think about</span></span>
+          </h1>
+        </div>
+
+        <div class="story__copy"></div>
+        <div class="story__labels" aria-hidden="true"></div>
+
+        <div class="gauge" aria-hidden="true">
+          <span class="gauge__k">Temperature at the copper</span>
+          <span class="gauge__v"><span class="gauge__n">25</span><span class="gauge__u">°C</span></span>
+          <span class="gauge__scale">
+            <span class="gauge__fill"></span>
+            <span class="gauge__tick" data-at="70"><span>Ordinary PVC wire 70°C</span></span>
+            <span class="gauge__tick is-rated" data-at="85"><span>Tamira 85°C</span></span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Later stages replace this with the rest of the site (Consumers, Industries, Investors, Company). -->
+    <section class="end" id="contact" aria-labelledby="end-title">
+      <h2 id="end-title" class="end__title">Talk to us about your next build.</h2>
+      <p class="end__body">Homes, offices or a whole development, we’ll help you pick the right wire.</p>
+      <a class="end__cta" href="mailto:hello@tamira.example">Contact us</a>
+    </section>
+  </main>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

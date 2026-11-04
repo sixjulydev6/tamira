@@ -1,0 +1,6 @@
+node_modules
+dist
+.DS_Store
+
+# client review recordings (large, not part of the site)
+assets/vids/
