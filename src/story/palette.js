@@ -4,7 +4,7 @@ import { local, lerp, smooth } from "./timeline.js";
    page and the 3D never show a seam. */
 export const COLORS = {
   day: "#ffffff",
-  navy: "#060d1f",     // wireframe night
+  night: "#140b07",    // wireframe night: deep warm brown (the hero's clay and crown-orange, after dark)
   lavender: "#e4e4ee", // the wire's world
   copper: "#ece5df",
   heat: "#efe5da",
@@ -23,9 +23,9 @@ const mixHex = (a, b, t) => {
 
 /** Page background and ink for overall progress p. */
 export function pageColors(p) {
-  // day (white) straight to the wireframe's navy as the lines draw on; no dusk/night stage
+  // day (white) straight to the wireframe's warm night as the lines draw on; no dusk stage
   const toNavy = smooth(0.12, 0.5, local(p, "wireOn"));
-  let bg = mixHex(COLORS.day, COLORS.navy, toNavy);
+  let bg = mixHex(COLORS.day, COLORS.night, toNavy);
   const toLight = smooth(0.14, 0.42, local(p, "drain"));
   bg = mixHex(bg, COLORS.lavender, toLight);
 

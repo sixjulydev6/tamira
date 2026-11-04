@@ -44,7 +44,8 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     uBg: { value: new THREE.Color() }, uRes: { value: new THREE.Vector2() }, uStage: { value: new THREE.Vector4() },
     uMaskMix: { value: 1 }, uMaskMode: { value: 0 }, uDrain: { value: 0 }, uDrainNdc: { value: new THREE.Vector2(-1.02, -1.0) },
     uFade: { value: 1 }, uReveal: { value: 0 }, uExtend: { value: 0 }, uFlow: { value: 0 }, uHead: { value: -1e4 }, uPower: { value: -1e4 },
-    uLine: { value: new THREE.Color("#1c8fff") }, uLineHot: { value: new THREE.Color("#8fe9ff") },
+    uDpr: { value: 1 },
+    uLine: { value: new THREE.Color("#e8582a") }, uLineHot: { value: new THREE.Color("#ffc69c") },   // crown orange, peach
   };
   const cityScene = new THREE.Scene();
   const city = buildCity(shared);
@@ -54,7 +55,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(cityScene, cityCam));
-  // threshold keeps the navy page and the hulls out of the glow; only the lines and lamps bloom
+  // threshold keeps the dark page and the hulls out of the glow; only the lines and lamps bloom
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.75, 0.4, 0.05);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
@@ -107,6 +108,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     wireRenderer.setSize(W, H, false);
     composer.setSize(W, H);
     shared.uRes.value.set(W * renderer.getPixelRatio(), H * renderer.getPixelRatio());
+    shared.uDpr.value = renderer.getPixelRatio();      // edge strips are sized in CSS px
 
     // where the day render actually sits: object-fit: cover inside the stage, at its object-position
     const s = stage.getBoundingClientRect();
@@ -190,7 +192,9 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     cityCam.fov = 2 * Math.atan(Math.tan(hfov / 2) / aspect) / DEG;
     cityCam.setViewOffset(fullW, fullH, lerp(-frame.x, 0, fb), lerp(-frame.y, 0, fb), W, H);
     cityCam.updateProjectionMatrix();
-    shared.uMaskMix.value = 1 - smooth(0, 0.6, fb);
+    // the day image is full screen with no CSS mask (the frame opens fully before "wireOn"),
+    // so the shaders' copy of that mask stays off
+    shared.uMaskMix.value = 0;
   }
 
   /* the city wire: runs along the avenue, then lifts its tip into the product shape */

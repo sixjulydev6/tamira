@@ -48,8 +48,12 @@ const CROWN_H = 132, CROWN_R = 31;
 function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
 /* line families: brightness multiplier (the shader colours them) */
-const FAM = { grid: 0.42, grid2: 0.62, contour: 1.0, crown: 1.6, crownGrid: 0.7, gminor: 0.16, gmajor: 1.15, gbranch: 0.55,
-  extContour: 0.5, extGrid: 0.17, avenue: 1.25, pole: 0.5 };
+const FAM = { grid: 0.2, grid2: 0.3, contour: 0.62, crown: 0.95, crownGrid: 0.32, gminor: 0.16, gmajor: 1.15, gbranch: 0.55,
+  extContour: 0.36, extGrid: 0.09, avenue: 1.25, pole: 0.5 };
+/* Building outlines are drawn as thick screen-space strips (CSS px); everything else stays a 1 px
+   line. The interior lines (floor rings, window grids, crown grid) are kept quiet so the
+   silhouettes carry the drawing. */
+const THICK = { contour: 1.2, crown: 1.4, extContour: 1.0 };   // CSS px; brightness above is per pixel, so thick edges sit lower
 
 /* The avenue the wire runs along: world Y at x = 228 m. It is the widest strip in front of the
    original city with no buildings, and on screen it runs lower-left → upper-right (like the train
@@ -59,10 +63,23 @@ export const AVENUE = { x: 228, half: 7, lampOffset: 10.5, lampStep: 36, lampZ: 
 
 export function buildCity(shared) {
   const pos = [], bright = [], extA = [];
+  const tk = { pos: [], other: [], side: [], end: [], bright: [], ext: [], width: [], idx: [] };   // thick edge strips
   let curExt = 0;                       // 1 = part of the extended city (grows in during "extend")
   const seg = (fam, ...pts) => {
     for (let i = 0; i < pts.length - 1; i++) {
-      pos.push(...pts[i], ...pts[i + 1]);
+      const a = pts[i], b = pts[i + 1];
+      if (THICK[fam]) {
+        // one quad per segment: each corner knows its own end, the other end, which end it is
+        // (0 = a, 1 = b) and its side of the strip (±1)
+        const base = tk.pos.length / 3;
+        for (const [p, q, e] of [[a, b, 0], [b, a, 1]]) for (const sd of [-1, 1]) {
+          tk.pos.push(...p); tk.other.push(...q); tk.end.push(e); tk.side.push(sd);
+          tk.bright.push(FAM[fam]); tk.ext.push(curExt); tk.width.push(THICK[fam]);
+        }
+        tk.idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+        continue;
+      }
+      pos.push(...a, ...b);
       bright.push(FAM[fam], FAM[fam]);
       extA.push(curExt, curExt);
     }
@@ -196,6 +213,19 @@ export function buildCity(shared) {
   lines.frustumCulled = false;
   group.add(lines);
 
+  const edgeGeo = new THREE.BufferGeometry();
+  edgeGeo.setAttribute("position", new THREE.Float32BufferAttribute(tk.pos, 3));
+  edgeGeo.setAttribute("aOther", new THREE.Float32BufferAttribute(tk.other, 3));
+  edgeGeo.setAttribute("aSide", new THREE.Float32BufferAttribute(tk.side, 1));
+  edgeGeo.setAttribute("aEnd", new THREE.Float32BufferAttribute(tk.end, 1));
+  edgeGeo.setAttribute("bright", new THREE.Float32BufferAttribute(tk.bright, 1));
+  edgeGeo.setAttribute("ext", new THREE.Float32BufferAttribute(tk.ext, 1));
+  edgeGeo.setAttribute("aWidth", new THREE.Float32BufferAttribute(tk.width, 1));
+  edgeGeo.setIndex(tk.idx);
+  const edges = new THREE.Mesh(edgeGeo, lineMaterial(shared, true));
+  edges.frustumCulled = false;
+  group.add(edges);
+
   // dark hulls so lines behind buildings are hidden, like the Blender wireframe pass
   const hullMat = surfaceMaterial(shared, 0.012);
   const boxGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0, 0.5);
@@ -281,7 +311,7 @@ function lampMesh(shared, lamps, pool) {
         vec2 dd = (vNdc - uDrainNdc) * vec2(uRes.x / uRes.y, 1.0);
         float alive = smoothstep(mix(4.2, -0.05, uDrain) - 0.02, mix(4.2, -0.05, uDrain) - 0.35, length(dd));
         float a = shape * lit * flash * alive * uFade * smoothstep(0.6, 1.0, uExtend);
-        gl_FragColor = vec4(vec3(1.0, 0.74, 0.38) * a, 1.0);
+        gl_FragColor = vec4(vec3(1.0, 0.84, 0.6) * a, 1.0);   // lamps: warm white, brighter than the orange lines
       }`,
     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false,
   }));
@@ -312,7 +342,7 @@ function extHullMaterial(shared) {
       ${COMMON}
       void main() {
         float alive = smoothstep(drainRadius() - 0.02, drainRadius() - 0.5, drainDist());
-        vec3 col = uBg + vec3(0.25, 0.55, 1.0) * 0.012 * alive;
+        vec3 col = uBg + vec3(1.0, 0.5, 0.26) * 0.012 * alive;
         col += litFacade(vWorld, vNrm) * alive;
         gl_FragColor = vec4(mix(uBg, col, stageMask() * uFade), 1.0);
       }`,
@@ -379,11 +409,11 @@ const COMMON = /* glsl */ `
     return mix(1.0, m, uMaskMix);
   }
 
-  // warm light from a powered facade: lit windows plus a faint glow on the wall
+  // warm light from a powered facade: its windows, nothing else
   vec3 litFacade(vec3 w, vec3 n) {
     if (abs(n.z) > 0.5) return vec3(0.0);
     float lit = powerLit(w);
-    return vec3(1.0, 0.55, 0.2) * (windowsOn(w, n, lit) * 0.5 + lit * 0.02);
+    return vec3(1.0, 0.78, 0.48) * windowsOn(w, n, lit) * 0.5;   // golden windows only, no wall glow
   }
 
   // distance from the drain point in screen space (aspect-corrected)
@@ -416,10 +446,48 @@ const VERT = /* glsl */ `
   }
 `;
 
-function lineMaterial(shared) {
+/* the building outlines: each segment is a quad pushed out sideways in screen space, so it is
+   aWidth CSS px wide at any distance; same varyings as VERT, plus vSide for a soft edge */
+const EDGE_VERT = /* glsl */ `
+  attribute float bright;
+  attribute float ext;
+  attribute vec3 aOther;
+  attribute float aSide;
+  attribute float aEnd;
+  attribute float aWidth;
+  uniform vec2 uRes;
+  uniform float uDpr;
+  varying float vBright;
+  varying float vZ;
+  varying float vExt;
+  varying vec2 vNdc;
+  varying vec3 vWorld;
+  varying vec3 vNrm;
+  varying float vSide;
+  void main() {
+    vBright = bright;
+    vExt = ext;
+    vZ = position.z;
+    vSide = aSide;
+    vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+    vNrm = vec3(0.0, 0.0, 1.0);
+    mat4 mvp = projectionMatrix * modelViewMatrix;
+    vec4 clip = mvp * vec4(position, 1.0);
+    vec4 clipO = mvp * vec4(aOther, 1.0);
+    vec2 sa = clip.xy / clip.w * uRes, sb = clipO.xy / clipO.w * uRes;   // ×2 of device px; fine for a direction
+    vec2 dir = (sb - sa) * (aEnd < 0.5 ? 1.0 : -1.0);   // always a → b, so ±side is the same side at both ends
+    vec2 n = length(dir) > 1e-5 ? normalize(vec2(-dir.y, dir.x)) : vec2(0.0, 1.0);
+    // half the width (+0.5 px for the soft edge), in device px → NDC (2 / uRes per px)
+    clip.xy += n * aSide * (aWidth * 0.5 * uDpr + 0.5) * 2.0 / uRes * clip.w;
+    vNdc = clip.xy / clip.w;
+    gl_Position = clip;
+  }
+`;
+
+function lineMaterial(shared, thick = false) {
   return new THREE.ShaderMaterial({
     uniforms: shared,
-    vertexShader: VERT,
+    vertexShader: thick ? EDGE_VERT : VERT,
     fragmentShader: /* glsl */ `
       ${COMMON}
       uniform float uReveal;
@@ -430,6 +498,7 @@ function lineMaterial(shared) {
       varying float vBright;
       varying float vZ;
       varying float vExt;
+      ${thick ? "varying float vSide;" : ""}
       void main() {
         // reveal: lines climb from the street up (tallest building ~ 140 m); the extended city grows later
         float level = vExt > 0.5 ? uExtend : uReveal;
@@ -443,10 +512,8 @@ function lineMaterial(shared) {
         float flow = mix(1.0, 0.55 + 0.9 * pulse, smoothstep(0.0, 0.25, uDrain));
         float a = grow * (alive * flow + edge * 2.2) * vBright;
         vec3 col = mix(uLine, uLineHot, clamp(vBright - 0.9, 0.0, 1.0) + edge);
-        // powered buildings (anything off the ground) turn warm and a little brighter
-        float lit = vZ > 0.15 ? powerLit(vWorld) : 0.0;
-        col = mix(col, vec3(1.0, 0.6, 0.26), lit * 0.75);
-        a *= 1.0 + 0.15 * lit;
+        // powering a building lights only its windows (litFacade, on the hulls); its lines stay as they are
+        ${thick ? "a *= 1.0 - smoothstep(0.6, 1.0, abs(vSide));   // soft strip edge" : ""}
         // additive: write only the light, the hulls/ground underneath already hold the page colour
         gl_FragColor = vec4(col * a * stageMask() * uFade, 1.0);
       }
@@ -455,6 +522,7 @@ function lineMaterial(shared) {
     transparent: true,
     depthWrite: false,
     toneMapped: false,
+    side: THREE.DoubleSide,      // the strips' winding depends on each segment's screen direction
   });
 }
 
@@ -468,7 +536,7 @@ function surfaceMaterial(shared, lift) {
       uniform float uLift;
       void main() {
         float alive = smoothstep(drainRadius() - 0.02, drainRadius() - 0.5, drainDist());
-        vec3 col = uBg + vec3(0.25, 0.55, 1.0) * uLift * alive;
+        vec3 col = uBg + vec3(1.0, 0.5, 0.26) * uLift * alive;
         col += litFacade(vWorld, vNrm) * alive;
         gl_FragColor = vec4(mix(uBg, col, stageMask() * uFade), 1.0);
       }

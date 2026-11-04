@@ -10,18 +10,19 @@ The layout, spacing and type metrics are adapted from **arrakis.tech**. They wer
 | `--container` | 84rem (1344px) | max content width, centred |
 | `--pad-x` | 20px, 48px from 1024px | side padding |
 | `--page-x` | `max(--pad-x, (100% − 84rem) / 2)` | puts full-bleed blocks on the grid; use it as `padding-inline` instead of wrapper elements |
-| `--indent` | 0, 52px from 1024px | hero and chapter copy sit one extra step in from the grid on desktop |
+| `--content-x` | = `--hero-media-margin`: 16px, then from 1024px `max(16px, (100vw − (100svh − 112px) × 1.65625) / 2)` (67px at 1440×900, 158px at 1920×1080) | the framed city's side margin; the header (wordmark, Contact, phone menu), chapter copy, the gauge and the Contact section line up with it. Replaced the old `--indent` (52px) |
 | `--header-height` | 64px, 86px from 640px | |
 
 ### Header
-- **Height and alignment:** 64 / 86px tall, contents centred vertically.
+- **Height and alignment:** 64 / 86px tall, contents centred vertically. Side edges are `--content-x`: the wordmark starts and the Contact button (or the phone Menu) ends on the framed city's edges.
 - **Wordmark:** fixed at about 102px wide (1.75rem Quicksand). 64px gap to the nav.
 - **Nav:** Consumers, Industries, Investors, Company, with 48px between items.
 - **Contact us:** an outlined red button on the far right (2px radius, padding 9 × 14px). It's outlined rather than filled because white text on the red is under 4.5:1 contrast at nav size.
 - **Below 1024px:** the nav collapses into a "Menu" dropdown.
 
 ### Composition rule: words left, object right
-- **Hero headline:** bottom-left, on the grid. Its bottom padding is 40px, then 48px from 640px, then 96px from 1024px.
+- **Hero (the one exception):** headline, one sentence and one button are centred under the header, above the framed city, never over it. It is the page's one centred moment (taste-skill: centre at most one moment). The frame uses the page grid's side margins and runs to the bottom of the viewport (client request); its top is the copy's bottom plus 24–48px.
+- **Hero button:** flat ink fill, white text, 2px radius, 44px tall. Ink rather than red because white on the brand red is under 4.5:1 at this size.
 - **Chapter copy:** upper-left, in a column about 31rem wide: title, then body, then a spec line.
 - **The visual** (city, wire, props) works in the right two-thirds. Copy never centres over the object.
 - **On phones:** copy sits at the top, and the wire is compressed into the lower part of the frame.
@@ -29,10 +30,11 @@ The layout, spacing and type metrics are adapted from **arrakis.tech**. They wer
 ## Type
 
 Fonts are **stand-ins** until the client supplies the real logo and brand font:
-- **Instrument Sans** (400 / 500) for UI, headline and copy.
+- **Geist Serif** (400, `--font-serif`) for every heading: the hero headline, chapter titles, the Contact title and the gauge number. Vercel's open-source serif (SIL OFL), self-hosted as `public/fonts/GeistSerifVF.woff2` (40 KB, preloaded) because it isn't on Google Fonts. Licence: `public/fonts/GeistSerif-OFL.txt`.
+- **Instrument Sans** (400 / 500) for UI and copy.
 - **Quicksand 600** for the wordmark.
 
-Both come from Google Fonts.
+Instrument Sans and Quicksand come from Google Fonts.
 
 ### Fluid scale
 Each size runs linearly from a 480px to a 1280px viewport, then holds.
@@ -40,8 +42,8 @@ Each size runs linearly from a 480px to a 1280px viewport, then holds.
 | Token | Size | Used for |
 |---|---|---|
 | `--text-display` | 36 → 56px | hero headline |
-| `--text-heading-48` | 28 → 48px | end title, gauge number |
-| `--text-heading-40` | 26 → 40px | chapter titles |
+| `--text-heading-48` | 28 → 48px | end title, gauge number (Geist Serif) |
+| `--text-heading-40` | 26 → 40px | chapter titles (Geist Serif) |
 | `--text-body-20` | 17 → 20px | (available) |
 | `--text-body-18` | 16 → 18px | chapter body, end body |
 | `--text-body-15` | 15px | spec lines, label values |
@@ -68,20 +70,21 @@ Each size runs linearly from a 480px to a 1280px viewport, then holds.
 |---|---|---|
 | Accent red | `#ea3c32` | wordmark, Contact button, end CTA (sampled from the client reference) |
 | Day page | `#ffffff` | hero |
-| Navy | `#060d1f` | wireframe city |
-| Wireframe line | `#1c8fff`, hot `#8fe9ff` | city lines (additive, with bloom) |
-| Warm light | lamps `(1.0, 0.74, 0.38)`, windows `(1.0, 0.55, 0.2)`, lit lines `(1.0, 0.6, 0.26)` (linear, additive) | street lights, lit buildings |
+| Warm night | `#140b07` | wireframe city (was navy `#060d1f`; DECISIONS 17) |
+| Wireframe line | `#e8582a` (crown orange), hot `#ffc69c` (peach) | city lines (additive, with bloom); building hulls lift toward warm. Building outlines are thick strips (1.2 px, crown 1.4, extended city 1.0, plus a 0.5 px soft edge); interior grids are faint 1 px lines |
+| Powered light | lamps `(1.0, 0.84, 0.6)`, windows `(1.0, 0.78, 0.48)` (linear, additive) | street lights and lit windows; a powered building lights only its windows, its outline stays orange |
+| Wire tip glow | `(1.0, 0.5, 0.16)` ember | copper strands in the city, cooling to copper at the hand-over |
 | Lavender | `#e4e4ee` | the wire's world |
 | Chapter tints | copper `#ece5df`, heat `#efe5da`, flame `#e4e7e3`, smoke `#e6e6ea` | soft per-chapter backgrounds |
 | Wire jacket | `#c21d19` with legend in `rgba(255, 232, 224, 0.62)` | |
 | Copper | `#d08a5a` (metal) | strands |
-| Ink | `#000` day · `#f3f1ee` on navy · `#1b1b22` on lavender | text; flips quickly so it's never grey-on-grey |
+| Ink | `#000` day · `#f3f1ee` on the warm night · `#1b1b22` on lavender | text; flips quickly so it's never grey-on-grey |
 
 **How page colour is driven:** it is set from scroll by `pageColors()` (`src/story/palette.js`) into `--bg` and `--ink`. Both canvases clear to the same colour, so the page and the 3D never show a seam.
 
 ## Motion rules
 
-- **All story motion is scroll-driven and reversible.** No timers, no ambient loops. The only time-based motion is the page-load reveal: the header fades in, the headline lines rise in turn with a 0.1s stagger, and the city fades in.
+- **All story motion is scroll-driven and reversible.** No timers. The time-based motion is the page-load reveal (the header fades in, the headline lines rise in turn with a 0.1s stagger, and the city fades in) and the hero's traffic loop (client request, DECISIONS 15).
 - **UI motion:**
   - ease-out for entrances
   - transitions of 300ms or less

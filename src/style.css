@@ -3,6 +3,16 @@
    Day → night is driven by one variable, --night (0 → 1), set from scroll.
    ------------------------------------------------------------------ */
 
+/* Geist Serif (Vercel, SIL OFL 1.1: public/fonts/GeistSerif-OFL.txt), self-hosted: it isn't on Google Fonts.
+   From the geist npm package 1.9.0; the variable file, declared at the 400 weight the package ships it as. */
+@font-face {
+  font-family: "Geist Serif";
+  src: url("/fonts/GeistSerifVF.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --red: #ea3c32;          /* wordmark + contact accent (sampled from the reference) */
   --day-bg: #ffffff;
@@ -10,7 +20,7 @@
   --day-ink: #000000;
   --night-ink: #f3f1ee;
 
-  /* page colour and ink are set from scroll (src/story/palette.js): white → dusk → navy → lavender */
+  /* page colour and ink are set from scroll (src/story/palette.js): white → warm night → lavender */
   --bg: var(--day-bg);
   --ink: var(--day-ink);
   --ink-soft: color-mix(in oklab, var(--ink), transparent 30%);
@@ -24,8 +34,15 @@
   --container: 84rem;
   --pad-x: calc(var(--space) * 5);
   --page-x: max(var(--pad-x), calc((100% - var(--container)) / 2));
-  --header-height: 4rem;
-  --indent: 0px;                   /* hero copy sits one step in from the grid on desktop */
+  --header-height: 5rem;
+  --hero-copy-top: 9.75rem;
+  --hero-media-gap: 2.5rem;
+  --hero-media-margin: 1rem;
+  --font-serif: "Geist Serif", "Times New Roman", Times, serif;   /* headings: hero, chapters, contact, gauge */
+  --font-hero: var(--font-serif);
+  /* Content edge for everything below the hero copy: the framed city's side margin (same formula as
+     main.js layoutFrame), so chapter copy, gauge and contact line up with the frame's edges. */
+  --content-x: var(--hero-media-margin);
 
   /* Type scale: every size runs linearly from a 480px to a 1280px viewport, then holds. */
   --text-display: clamp(2.25rem, 1.5rem + 2.5vw, 3.5rem);        /* 36 → 56 */
@@ -93,7 +110,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ------------------------------------------------------------------ header */
 
-/* Wordmark and nav sit together on the left; "Contact us" is pushed to the far right. */
+/* Reference framing: wordmark left, centered navigation, contact action right. */
 .site-header {
   position: fixed;
   inset: 0 0 auto 0;
@@ -101,8 +118,9 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   gap: calc(var(--space) * 16);
+  top: 1rem;
   height: var(--header-height);
-  padding-inline: var(--page-x);
+  padding-inline: var(--content-x);   /* wordmark and Contact on the framed city's edges */
   pointer-events: none;            /* only the links/buttons take clicks */
 }
 .site-header > * { pointer-events: auto; }
@@ -135,8 +153,8 @@ a { color: inherit; text-decoration: none; }
   position: relative;
   display: inline-block;
   padding-block: var(--space);
-  font-size: var(--text-nav);
-  font-weight: 400;
+  font-size: 1rem;
+  font-weight: 500;
   line-height: var(--leading-nav);
   color: var(--ink);
   transition-property: opacity;
@@ -151,12 +169,13 @@ a { color: inherit; text-decoration: none; }
   height: 44px;
   transform: translateY(-50%);
 }
-/* outlined rather than filled: white on this red is under 4.5:1 at nav size */
+/* The reference header uses a quiet filled pill for its secondary action. */
 .nav-list .nav-contact {
   padding: 0.5625rem 0.875rem;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-xs);
-  color: var(--red);
+  border: 0;
+  border-radius: 999px;
+  background: #f7f5f0;
+  color: var(--day-ink);
   white-space: nowrap;
 }
 
@@ -208,23 +227,15 @@ a { color: inherit; text-decoration: none; }
 .story__canvas--wire { visibility: hidden; }   /* above the city canvas (later in the DOM) */
 
 .hero__stage {
-  /* the city fills the right of the frame; the headline sits bottom-left */
+  /* The city is one full-screen layer. main.js clips it to a frame under the headline (equal
+     margins on the page grid) and opens the clip to the whole screen on the first scroll, so the
+     wireframe hand-over always meets a full-screen cover image. The fallback clip below is the
+     framed state before the script measures the copy. */
   position: absolute;
-  top: var(--header-height);
-  right: 0;
-  bottom: 0;
-  left: clamp(0px, 20vw, 360px);
-  /* fade into the page at the top, and away from the bottom-left corner where the headline sits */
-  -webkit-mask-image:
-    linear-gradient(to bottom, transparent 0%, #000 28%),
-    linear-gradient(to right, transparent 0%, #000 30%),
-    linear-gradient(to top right, transparent 0%, transparent 12%, #000 48%);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(to bottom, transparent 0%, #000 28%),
-    linear-gradient(to right, transparent 0%, #000 30%),
-    linear-gradient(to top right, transparent 0%, transparent 12%, #000 48%);
-  mask-composite: intersect;
+  inset: 0;
+  overflow: hidden;
+  clip-path: inset(46svh var(--hero-media-margin) 0 var(--hero-media-margin));
+  will-change: clip-path;
 }
 
 .hero__poster,
@@ -235,36 +246,74 @@ a { color: inherit; text-decoration: none; }
   height: 100%;
   object-fit: cover;
   object-position: 50% 58%;
+  transform-origin: 0 0;           /* main.js scales/moves it so the crown sits centred in the frame */
+  will-change: transform;
 }
-.hero__video { opacity: 0; }       /* shown once it can seek */
+/* traffic loop: starts on the poster's own frame; the short fade hides the codec's slight colour shift */
+.hero__video { opacity: 0; transition: opacity 300ms ease-out; }
 .hero__video.is-ready { opacity: 1; }
 
-/* Copy is anchored to the bottom of the frame, on the grid, one indent step in on desktop. */
+/* The hero's one centred moment: headline, one sentence, one action, above the framed city
+   (never over it). The frame starts just under this block; see main.js layoutFrame(). */
 .hero__copy {
-  position: relative;
+  position: absolute;
+  inset: 0 0 auto 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
-  padding-top: var(--header-height);
-  padding-bottom: calc(var(--space) * 10);
-  padding-inline: calc(var(--page-x) + var(--indent)) var(--page-x);
+  align-items: center;
+  text-align: center;
+  padding-top: var(--hero-copy-top);
+  padding-inline: var(--page-x);
 }
 
 .hero__title {
   margin: 0;
-  max-width: 56rem;
-  font-weight: 400;                /* lightest weight Instrument Sans ships */
-  font-size: var(--text-display);
-  line-height: var(--leading-display);
-  letter-spacing: var(--tracking-heading);
+  width: 100%;
+  max-width: 49.625rem;
+  font-family: var(--font-hero);
+  font-weight: 400;
+  font-size: 44px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
   color: var(--ink);
   text-wrap: balance;
 }
 /* the tight leading would clip descenders inside the reveal mask; pad the mask, pull the next line back */
 .hero__title .line { display: block; overflow: hidden; padding-bottom: 0.14em; margin-bottom: -0.14em; }
 .hero__title .line__inner { display: inline-block; }
+
+.hero__lede {
+  max-width: 49.625rem;
+  margin: 12px 0 0;
+  font-size: 18px;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--ink) 66%, var(--bg));
+  text-wrap: pretty;
+}
+
+/* One primary action; deeper brand red maintains contrast with white text. */
+.hero__cta {
+  display: inline-flex;
+  align-items: center;
+  height: 49px;
+  min-height: 49px;
+  margin-top: 24px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #d9362c;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 500;
+  transition-property: background-color, scale;   /* not opacity: the page-load reveal animates it */
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-out-quint);
+}
+.hero__cta:active { scale: 0.97; }
+@media (hover: hover) and (pointer: fine) {
+  .hero__cta:hover { background: #bc2c24; }
+}
 
 /* ------------------------------------------------------------------ wire chapters
    Copy always sits in the left column, upper part of the frame; the wire works on the right. */
@@ -274,13 +323,14 @@ a { color: inherit; text-decoration: none; }
 .chapter {
   position: absolute;
   top: calc(var(--header-height) + clamp(24px, 7svh, 88px));
-  left: calc(var(--page-x) + var(--indent));
-  width: min(31rem, calc(100% - 2 * var(--page-x)));
+  left: var(--content-x);
+  width: min(31rem, calc(100% - 2 * var(--content-x)));
   visibility: hidden;
   opacity: 0;
 }
 .chapter__title {
   margin: 0;
+  font-family: var(--font-serif);
   font-weight: 400;
   font-size: var(--text-heading-40);
   line-height: var(--leading-heading);
@@ -340,9 +390,9 @@ a { color: inherit; text-decoration: none; }
 .gauge {
   position: absolute;
   z-index: 3;
-  right: var(--page-x);
+  right: var(--content-x);
   bottom: clamp(32px, 9svh, 96px);
-  width: min(22rem, calc(100% - 2 * var(--page-x)));
+  width: min(22rem, calc(100% - 2 * var(--content-x)));
   display: grid;
   gap: calc(var(--space) * 2);
   opacity: 0;
@@ -351,7 +401,7 @@ a { color: inherit; text-decoration: none; }
 }
 .gauge__k { font-size: 0.8125rem; letter-spacing: var(--tracking-small); color: var(--ink-soft); }
 .gauge__v { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
-.gauge__n { font-size: var(--text-heading-48); line-height: 1; letter-spacing: var(--tracking-heading); }
+.gauge__n { font-family: var(--font-serif); font-size: var(--text-heading-48); line-height: 1; letter-spacing: var(--tracking-heading); }
 .gauge__u { font-size: var(--text-body-18); color: var(--ink-soft); }
 .gauge__scale {
   position: relative;
@@ -371,7 +421,7 @@ a { color: inherit; text-decoration: none; }
 .gauge__tick span {
   position: absolute;
   top: 18px;
-  transform: translateX(-50%);
+  right: 0;                        /* ends at its tick: the 70 and 85 ticks are ~80px apart, centred labels collided */
   white-space: nowrap;
   font-size: 0.75rem;
   color: var(--ink-soft);
@@ -384,12 +434,13 @@ a { color: inherit; text-decoration: none; }
 .end {
   position: relative;
   z-index: 1;
-  padding: clamp(96px, 18svh, 200px) calc(var(--page-x) + var(--indent)) clamp(96px, 16svh, 180px) ;
+  padding: clamp(96px, 18svh, 200px) var(--content-x) clamp(96px, 16svh, 180px);
   background: var(--bg);
 }
 .end__title {
   margin: 0;
   max-width: 40rem;
+  font-family: var(--font-serif);
   font-weight: 400;
   font-size: var(--text-heading-48);
   line-height: var(--leading-heading);
@@ -427,16 +478,27 @@ a { color: inherit; text-decoration: none; }
 .story.is-static { height: auto; }
 .is-static .site-header { background: var(--bg); }   /* content scrolls under it in the static layout */
 .story.is-static .story__stage { position: relative; height: auto; overflow: visible; }
-.story.is-static .hero__stage { position: relative; inset: auto; height: 70svh; margin-top: var(--header-height); }
+/* first screen: copy, then the framed city filling the rest of the viewport */
+.story.is-static .story__stage { display: flex; flex-direction: column; }
+.story.is-static .hero__copy { position: relative; inset: auto; order: -1; }
+.story.is-static .hero__stage {
+  position: relative; inset: auto;
+  flex: none;
+  height: max(50svh, 100svh - var(--hero-copy-h, 22rem) - var(--space) * 10);
+  margin: var(--hero-media-gap) var(--hero-media-margin) 0;
+  clip-path: none;
+}
+.story.is-static .hero__poster,
+.story.is-static .hero__video { transform: none; }
 .story.is-static .story__canvas,
 .story.is-static .story__labels,
 .story.is-static .gauge { display: none; }
-.story.is-static .hero__copy { height: auto; padding-top: calc(var(--space) * 8); }
-.story.is-static .story__copy { position: relative; inset: auto; padding: 0 var(--page-x); }
+.story.is-static .hero__copy { padding-top: var(--hero-copy-top); }
+.story.is-static .story__copy { position: relative; inset: auto; padding: 0 var(--content-x); }
 .story.is-static .chapter {
   position: relative; top: auto; left: auto;
   width: auto;
-  padding: calc(var(--space) * 16) var(--indent) 0;
+  padding: calc(var(--space) * 16) 0 0;
   visibility: visible;
   opacity: 1;
 }
@@ -444,8 +506,7 @@ a { color: inherit; text-decoration: none; }
 /* ------------------------------------------------------------------ grid steps */
 
 @media (min-width: 640px) {
-  :root { --header-height: 5.375rem; }
-  .hero__copy { padding-bottom: calc(var(--space) * 12); }
+  :root { --header-height: 5rem; }
 }
 
 @media (min-width: 768px) {
@@ -458,9 +519,10 @@ a { color: inherit; text-decoration: none; }
 @media (min-width: 1024px) {
   :root {
     --pad-x: calc(var(--space) * 12);
-    --indent: calc(var(--space) * 13);
+    --hero-copy-top: 13.4rem;
+    --hero-media-gap: 5.5rem;
+    --hero-media-margin: max(1rem, calc((100vw - (100svh - 112px) * 1.65625) / 2));
   }
-  .hero__copy { padding-bottom: calc(var(--space) * 24); }
 }
 
 /* ------------------------------------------------------------------ small screens */
@@ -472,7 +534,7 @@ a { color: inherit; text-decoration: none; }
   .nav-list {
     position: absolute;
     top: calc(100% + 4px);
-    right: var(--page-x);
+    right: var(--content-x);
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
@@ -502,18 +564,12 @@ a { color: inherit; text-decoration: none; }
   }
 }
 
-/* phones and small tablets: the city sits above, the headline below it */
+/* phones and small tablets: same layout, the frame is a portrait window on the crown */
 @media (max-width: 860px) {
-  .hero__stage {
-    left: 0;
-    bottom: auto;
-    height: 70svh;
-    -webkit-mask-image:
-      linear-gradient(to bottom, transparent 0%, #000 18%, #000 74%, transparent 100%);
-    mask-image:
-      linear-gradient(to bottom, transparent 0%, #000 18%, #000 74%, transparent 100%);
-  }
-  .hero__poster, .hero__video { object-position: 50% 60%; }
+  .hero__copy { padding-inline: 16px; }
+  .hero__title .line { display: inline; overflow: visible; padding: 0; margin: 0; }
+  .hero__title .line__inner { display: inline; }
+  .hero__title .line + .line::before { content: " "; }
 }
 
 /* ------------------------------------------------------------------ reduced motion: static day frame, no transitions */
@@ -522,6 +578,23 @@ a { color: inherit; text-decoration: none; }
   .skip-link,
   .nav-list a,
   .menu-toggle,
-  .nav-list { transition: none; }
+  .nav-list,
+  .hero__cta { transition: none; }
   .hero__video { display: none; }
+}
+
+/* Measured incident.io hero: 794px measure, 80/80 display, 12px copy gap, 49px action.
+   The source's proprietary Bureau Serif is represented by Geist Serif. */
+@media (min-width: 1024px) {
+  .hero__title { font-size: 80px; line-height: 1; letter-spacing: -0.04em; }
+  .hero__lede { font-size: 24px; line-height: 1.3; min-height: 62.4px; }
+  .site-header { top: 3.4rem; }
+  .primary-nav { position: absolute; inset-inline: 0; pointer-events: none; }
+  .nav-list a { pointer-events: auto; }
+  .nav-list { justify-content: center; gap: 24px; }
+  .nav-list li:last-child { position: absolute; right: var(--content-x); margin-left: 0; }
+  .nav-list .nav-contact { padding: 10px 16px; }
+}
+@media (min-width: 861px) and (max-width: 1023px) {
+  .hero__title { font-size: 60px; }
 }

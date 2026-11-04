@@ -7,10 +7,13 @@
   <meta name="description" content="Tamira makes wiring and cable for homes, industry and infrastructure.">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/GeistSerifVF.woff2" as="font" type="font/woff2" crossorigin>   <!-- hero headline -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&family=Quicksand:wght@600&display=swap" rel="stylesheet">
-  <link rel="preload" as="image" href="/media/hero-day.jpg">
+  <link rel="preload" as="image" type="image/avif"
+        imagesrcset="/media/hero-city-1920.avif 1920w, /media/hero-city-2560.avif 2560w, /media/hero-city-3840.avif 3840w"
+        imagesizes="max(100vw, 178svh)">
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
@@ -39,8 +42,30 @@
          into the wire's tip, and the wire tells its own story on a light page. -->
     <section class="story" aria-labelledby="hero-title">
       <div class="story__stage">
+        <!-- The day city: a Cycles render from art/blender/build_city.py. Same camera and layout as the
+             3D wireframe (src/story/city.js), so the lines land on its edges. Every source keeps the
+             16:9 frame that scene.js maps the camera onto; only the resolution changes.
+             The layer is always full screen; main.js clips it to a frame under the headline and opens
+             the clip to the whole screen on the first scroll ("open"). -->
         <div class="hero__stage" aria-hidden="true">
-          <img class="hero__poster" src="/media/hero-day.jpg" alt="" width="1920" height="1080" decoding="async" fetchpriority="high">
+          <picture>
+            <source type="image/avif" srcset="/media/hero-city-1920.avif 1920w, /media/hero-city-2560.avif 2560w, /media/hero-city-3840.avif 3840w"
+                    sizes="max(100vw, 178svh)">
+            <source type="image/webp" srcset="/media/hero-city-1920.webp 1920w, /media/hero-city-2560.webp 2560w, /media/hero-city-3840.webp 3840w"
+                    sizes="max(100vw, 178svh)">
+            <img class="hero__poster" src="/media/hero-city-1920.jpg"
+                 srcset="/media/hero-city-1920.jpg 1920w, /media/hero-city-2560.jpg 2560w, /media/hero-city-3840.jpg 3840w"
+                 sizes="max(100vw, 178svh)"
+                 alt="" width="1920" height="1080" decoding="async" fetchpriority="high">
+          </picture>
+          <!-- Traffic loop (art/blender/animate_city.py): the same city and camera with cars driving the
+               streets. Its first frame is the poster above, so it fades in without a jump. main.js starts
+               it after first paint and only while the city is on screen; never under reduced motion. -->
+          <video class="hero__video" muted playsinline loop preload="none" disablepictureinpicture
+                 width="2560" height="1440" aria-hidden="true">
+            <source src="/media/hero-traffic-2560.webm" type='video/webm; codecs="av01.0.08M.08"'>
+            <source src="/media/hero-traffic-2560.mp4" type="video/mp4">
+          </video>
         </div>
 
         <canvas class="story__canvas" aria-hidden="true"></canvas>
@@ -51,6 +76,8 @@
             <span class="line"><span class="line__inner">Good wiring is the kind</span></span>
             <span class="line"><span class="line__inner">you never think about</span></span>
           </h1>
+          <p class="hero__lede">Tamira makes copper house wire for homes and buildings: safe, flexible, and built to last.</p>
+          <a class="hero__cta" href="#contact">Talk to us</a>
         </div>
 
         <div class="story__copy"></div>

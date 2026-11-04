@@ -17,17 +17,20 @@ src/story/
                            all city shaders (lines, hulls, lamps, building lights)
   wire.js                  Wire class: procedural single-core wire (jacket + 30 strands) bent onto a path
   props.js                 conduit, heater, flame, smoke puffs, wall switch plate (procedural)
-public/media/hero-day.jpg  the day render, 1920×1080, the hero image
+public/media/hero-city-*   the day render, 16:9, 1920, 2560 and 3840 wide (AVIF / WebP / JPG), the hero image
+public/media/hero-traffic-2560.{webm,mp4}   the traffic loop over it (AV1 / H.264); frame 0 = hero-city
+art/                       the hero's Blender source, layout manifest and checks (art/README.md)
 ```
 
 ## The stage
 
 There is one `<section class="story">`, `(TOTAL_SCREENS + 1) × 100svh` tall. Inside it, `.story__stage` is `position: sticky`, 100svh tall. Its layers, bottom to top:
 
-1. `.hero__stage`: the day image (`img.hero__poster`), with a CSS mask fading it into the page.
+1. `.hero__stage`: the day image (`<picture>` → `img.hero__poster`), a full-screen cover layer. `main.js` clips it to the hero frame (`clip-path: inset()`) and scales/moves the image so the crown sits in the frame (`layoutFrame`, `setFrame`); `open` takes both to identity. No CSS mask (and `uMaskMix` is 0). Every source must stay 16:9: `resize()` fits the camera to the image's `object-fit: cover` frame using `VIDEO_W/H` (1920×1080), which only fixes the aspect, not the resolution.
+   - `video.hero__video` inside it: the traffic loop. `setFrame` gives it the image's transform; `setTraffic` plays it after `load` while `wireOn < 1` and pauses it otherwise (and when the tab is hidden). It fades in on `playing`. Skipped on Save-Data; hidden under reduced motion.
 2. `canvas.story__canvas`: the **city** renderer (wireframe city, street lights, city wire).
 3. `canvas.story__canvas--wire`: the **product wire** renderer (chapters).
-4. `.hero__copy`: the hero headline.
+4. `.hero__copy`: the centred hero headline, sentence and button (above the frame; fades out in `open`).
 5. `.story__copy`: one `<article class="chapter">` per chapter (built from `chapters.js`).
 6. `.story__labels`: the three pinned labels for the strands chapter.
 7. `.gauge`: the temperature gauge for the heat chapter.
@@ -59,14 +62,15 @@ Two WebGL renderers on two canvases. The city one uses bloom; the product one do
 ### City renderer (`renderer`, on `.story__canvas`)
 
 **Pipeline:** `EffectComposer` running RenderPass → UnrealBloomPass (threshold 0.05) → OutputPass, with no tone mapping.
-- Bloom strength is 0 while the page is light. It ramps up as the page turns navy and goes back down during the drain.
+- Bloom strength is 0 while the page is light. It ramps up as the page turns dark and goes back down during the drain.
 - **Then the city wire:** after the composer, `clearDepth()` runs and `cityWireScene` is rendered on top with Neutral tone mapping. This keeps the wire crisp (no bloom on it). The consequence: **nothing in the city can occlude the city wire**. That's why the avenue and the approach path are kept clear of buildings.
 
 **What's in `cityScene`** (all custom `ShaderMaterial`s, all unlit):
 
 | Object | Notes |
 |---|---|
-| `LineSegments` | Every wireframe line. Per-vertex attributes: `bright` (line family brightness) and `ext` (1 = extended city). |
+| `LineSegments` | The 1 px lines: interior grids (floor rings, window columns, crown grid, kept faint), ground grid, roads, poles. Per-vertex attributes: `bright` (line family brightness) and `ext` (1 = extended city). |
+| Edge strips (`Mesh`) | Building outlines (`contour`, `crown`, `extContour`; widths in `THICK`, CSS px). Each segment is a quad expanded sideways in screen space by `EDGE_VERT` (attributes `aOther`, `aEnd`, `aSide`, `aWidth`; uniform `uDpr`), drawn double-sided with the same fragment shader as the lines, plus a soft edge. WebGL can't draw lines wider than 1 px, hence the quads. |
 | Building hulls | Original-city boxes, crown extrusions, and the extended city as one `InstancedMesh`. They hide lines behind buildings and carry the lit windows. |
 | Ground | A 6 km plane. |
 | Street lights | Two instanced meshes: camera-facing glow billboards and flat light pools on the street. |
@@ -121,9 +125,9 @@ A direct JS port of `tamira-reference-match/blender/hero_day.py`:
 |---|---|
 | `powerLit(w)` | `smoothstep(0, 18, uPower − (w.y + 0.35·|w.x − 228|))`. Powered once the front has passed a point; further from the avenue lights later. |
 | `windowsOn(w, n, lit)` | A procedural 4.6 m window grid on vertical faces. Each window has a random threshold, so they switch on one by one. |
-| `litFacade(w, n)` | Warm window light plus a faint wall glow. Added to the hull colour. |
+| `litFacade(w, n)` | Warm window light only (no wall glow). Added to the hull colour. |
 
-Lines above street level turn from cyan to warm when lit.
+Lit buildings change only their windows; their lines and walls don't change.
 
 ## The wire (`wire.js`)
 
@@ -140,7 +144,7 @@ Lines above street level turn from cyan to warm when lit.
 | `head` | Tip position as a fraction of path length |
 | `strip` | Stripped length |
 | `fan` | How far the strands spread past the jacket |
-| `glow` | Cyan glow on the strands |
+| `glow` | Ember-orange glow on the strands |
 | `cut`, `cutAt` | Cutaway window |
 | `heat`, `heatAt` | Orange heat band |
 | `char`, `charAt` | Burn mark |

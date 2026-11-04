@@ -5,8 +5,9 @@
    ------------------------------------------------------------------ */
 
 export const SEGMENTS = [
-  { id: "day",     screens: 0.35 }, // the day city, held: a short beat before anything moves
-  { id: "wireOn",  screens: 1.2 },  // day → wireframe: cyan lines draw on over the render's edges, page white → navy
+  { id: "day",     screens: 0.35 }, // the day city in its frame under the headline, held: a short beat before anything moves
+  { id: "open",    screens: 1.2 },  // the headline lifts away and the frame opens to the full screen: the immersive city
+  { id: "wireOn",  screens: 1.2 },  // day → wireframe: orange lines draw on over the render's edges, page white → warm night
   { id: "extend",  screens: 1.4 },  // camera pulls back; more city grows in around a street-lit avenue
   { id: "run",     screens: 2.2 },  // the wire runs along the avenue; street lights switch on as its tip passes
   { id: "approach", screens: 1.4 }, // push-in from the diagonal city view until the wire is a close diagonal across the frame

@@ -61,7 +61,7 @@ export class Wire {
       Object.assign(shader.uniforms, this.strandUniforms);
       shader.fragmentShader = shader.fragmentShader
         .replace("void main() {", "uniform float uGlow;\nvoid main() {")
-        .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(0.25, 0.8, 1.0) * uGlow * 2.2;");
+        .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(1.0, 0.5, 0.16) * uGlow * 2.2;   // ember glow (was cyan)");
     };
     this.strands = new THREE.Mesh(this.strandGeo, copper);
     this.strands.frustumCulled = false;

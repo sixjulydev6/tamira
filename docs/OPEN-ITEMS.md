@@ -13,13 +13,16 @@
 | End / Contact section | `.end` in `index.html` | Real copy, and a real address (currently `mailto:hello@tamira.example`) |
 | Finale | Wire into a wall switch plate | The client's choice of ending (see open questions) |
 | Props | Procedural conduit, heater, flame, smoke, switch plate | Optional Blender GLBs for higher fidelity |
+| Hero sentence | `.hero__lede` in `index.html` | Client sign-off on "Tamira makes copper house wire for homes and buildings: safe, flexible, and built to last." |
+| Hero traffic in the framed view | `ROUTES` / `DENSITY` in `art/blender/animate_city.py` | The resting frame shows only the top band of the city, where few cars drive; more traffic on the top streets was offered |
+| Hero finish sign-off | `public/media/hero-city-*` | A side-by-side against the client's quality references (images 2–4 of the brief), which weren't available as files when the render was tuned |
 
 ## Open questions for the client
 
 1. **Real specs and size range** for the house wire (see above).
 2. **Finale:** keep the switch plate, an interior room where the lights come on, or a return to the city?
 3. **Other sections:** do Consumers, Industries, Investors and Company follow on the homepage, or are they separate pages?
-4. **Street-light colour:** currently warm amber (contrast with the cyan city, echoing the yellow dashed lights in the reference). Should it match the cyan instead?
+4. **Street-light colour:** now warm white against the orange city (it was amber against cyan before DECISIONS 17; echoing the yellow dashed lights in the reference). Should it match the cyan instead?
 5. **Extended city style:** wireframe (current) or solid white blocks like the reference stills?
 6. **Source code:** is the wirecable-showcase repo available? Its shaders could improve the flame and smoke.
 
@@ -34,15 +37,20 @@
   - Two WebGL contexts, bloom on the city, and a CPU rebuild of the wire geometry per scroll tick.
   - Should be profiled on mid-range Android and iOS.
   - Consider a lower pixel ratio or no bloom on low-end GPUs.
-- **Unused media** (`hero-day-night*.mp4`, `hero-night.jpg`) still ships in `dist/`.
+- **Unused media** (`hero-day.jpg`, `hero-day-night*.mp4`, `hero-night.jpg`) still ships in `dist/`.
+- **Phone framing of the hero** is the 16:9 render cropped by `object-fit: cover` (the frame is a portrait window on the crown, then full-screen cover). There is no dedicated portrait render.
+- **`?at=run:0.75` shows the wire but no city** when reached by the dev `?at=` jump, in headless **and** headed Chrome (dark page, no lines or lit buildings); the same for `?at=approach:0.99`. Scrolling there renders the city correctly (checked 2026-11-04), so it is a state the jump skips, not a rendering failure. It is the same on the commit before the framed hero, so it predates it; check in a real browser by scrolling, then investigate `scene.js` / `city.js` around the run.
+- **Static fallback hero** (`.story.is-static`, 70svh stage) loses the crown's top under the top mask fade on desktop. This was the same before the new render.
 - **Static fallback** (reduced motion / no WebGL) is functional but plain. It has no chapter visuals, only the day image and the copy.
+- **Phone heat chapter:** the 3D heater block covers the gauge's readout ("Temperature at the copper" / number) at 390×844. It predates the margin change; move the gauge up or the heater down on portrait.
 - **Labels** in the strands chapter are positioned from 3D points and can overlap the copy on very short viewports.
 
 ## Pre-launch checklist
 
 - [ ] Replace placeholder specs, legend, logo, font, favicon, contact address
 - [ ] Decide the finale; build it
-- [ ] Remove unused media from `public/media/`
+- [ ] Remove unused media from `public/media/` (now including `hero-day.jpg`)
+- [ ] Client sign-off on the clay hero against their reference images
 - [ ] Real-device testing: iPhone Safari, Android Chrome, low-end laptop
 - [ ] Performance profiling; adaptive quality if needed
 - [ ] Accessibility pass: screen-reader order of chapter copy, focus states, contrast on every background tint

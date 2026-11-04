@@ -5,7 +5,7 @@ The whole homepage is one pinned stage. A single scroll progress value `p` (0 �
 - the 3D camera, wire and shaders
 - the copy, the labels and the gauge
 
-Each of these is a pure function of `p`. Nothing moves on a timer, so scrolling back reverses everything exactly. The only time-based motion on the page is the one-off page-load reveal.
+Each of these is a pure function of `p`. Nothing moves on a timer, so scrolling back reverses everything exactly. The only time-based motion is the one-off page-load reveal and the hero's traffic loop, a fixed backdrop that pauses once the wireframe takes over.
 
 ## How the scroll is divided
 
@@ -13,8 +13,9 @@ The story is split into **segments**. Each segment gets a length in **screens**,
 
 | # | Segment | Screens | What happens |
 |---|---|---|---|
-| 1 | `day` | 0.35 | The day city render holds still. A short beat before anything moves. |
-| 2 | `wireOn` | 1.2 | The day city turns into the wireframe: the page goes white → navy and cyan lines climb the same buildings. |
+| 1 | `day` | 0.35 | Centred headline, one sentence and one button over a framed day city. A short beat before anything moves. |
+| 1b | `open` | 1.2 | The copy lifts away and the frame opens to the full screen: the immersive city, held still. |
+| 2 | `wireOn` | 1.2 | The day city turns into the wireframe: the page goes white → warm night and orange lines climb the same buildings. |
 | 3 | `extend` | 1.4 | The camera pulls back; a larger wireframe city grows in around a street-lit avenue. |
 | 4 | `run` | 2.2 | The red wire runs along the avenue. Street lights and buildings light up behind its tip. |
 | 5 | `approach` | 1.4 | One continuous push-in from the wide diagonal view to a close diagonal of the wire. |
@@ -28,23 +29,30 @@ The story is split into **segments**. Each segment gets a length in **screens**,
 | 13 | `smoke` | 1.3 | Chapter: "It gives off less smoke, too." |
 | 14 | `finale` | 1.7 | Chapter: "Wire it once, and forget it's there." |
 
-- **Total:** 19.95 screens of story. The `.story` section is `(19.95 + 1) × 100svh` tall; the extra screen is the pinned stage itself.
+- **Total:** 21.15 screens of story. The `.story` section is `(21.15 + 1) × 100svh` tall; the extra screen is the pinned stage itself.
 - **Retuning pacing:** change the `screens` values. Everything inside a segment is expressed as 0–1 progress through it (`local(p, id)`), so lengths can change freely.
 - **Jumping to a moment (dev only):** `?at=<segment>:<t>`, for example `?at=approach:0.99`.
 
 ## Beat by beat
 
 ### 1. Day (`day`)
-- **What's on screen:** the still day render of the isometric city (`hero-day.jpg`, rendered in Blender) on the right. The headline "Good wiring is the kind / you never think about" sits bottom-left, with the header across the top.
-- **How the image sits:** it is masked so it fades into the white page at its top, its left, and toward the bottom-left corner where the headline is.
-- **Page load:** the header fades in, the two headline lines rise in turn, and the city fades in. This is the only time-based motion on the page.
+- **What's on screen:** the header; under it, centred, the headline "Good wiring is the kind / you never think about", one sentence ("Tamira makes copper house wire for homes and buildings: safe, flexible, and built to last.") and one button ("Talk to us" → contact). Below that, the day city (`hero-city-*`, the clay Cycles render) in a frame on the page grid: equal side margins, running to the bottom of the viewport, square corners, the crown tower centred with its whole star inside the frame.
+- **How the frame works:** the city is one full-screen `object-fit: cover` layer. `main.js` (`layoutFrame` / `setFrame`) clips it to the frame with `clip-path: inset()` and scales/moves the image so the crown sits in the frame. There are no CSS masks.
+- **Traffic:** after page load a 10 s seamless loop of small clay cars driving the streets fades in over the still (`.hero__video`, `hero-traffic-2560.webm` / `.mp4`, rendered by `art/blender/animate_city.py`). Same camera and city, so it's the poster with cars moving; frame 0 is the poster. It keeps playing while the frame opens and pauses once `wireOn` hides the image. Not loaded under reduced motion or Save-Data.
+- **Page load:** the header fades in, the two headline lines rise in turn, the sentence and button follow, and the framed city fades in. Then the traffic loop starts over the still (below).
+
+### 1b. The frame opens (`open`)
+- **0–20%:** the headline, sentence and button rise 24px and fade out (gone before the frame's edge reaches them).
+- **14–85%:** the clip opens to the full screen while the image scales/moves back to its plain full-screen cover framing (a pure function of scroll, reversible).
+- **85–100%:** the full-screen city holds: the immersive beat. The image is now exactly the frame the wireframe hand-over is aligned to.
+- Pattern adapted from incident.io's hero (a framed panel under a centred headline that grows as you scroll), with the city in place of a product mock-up and opening all the way to full bleed.
 
 ### 2. Day → wireframe (`wireOn`)
-- **Page colour:** white → navy (`#060d1f`) over roughly 12–50% of the segment.
+- **Page colour:** white → warm night (`#140b07`) over roughly 12–50% of the segment.
 - **The hand-over to 3D:** the city canvas fades in over the image. It draws:
   - a backdrop in the page colour
   - dark hulls for the buildings
-  - cyan lines that climb the buildings from street level
+  - crown-orange lines that climb the buildings from street level
 - **Why the lines line up:** they are drawn exactly on the render's building edges, because the 3D city is a port of the Blender layout and the 3D camera reproduces the Blender camera (see [ARCHITECTURE.md](ARCHITECTURE.md#the-exact-hand-off-from-the-day-image)).
 - **Glow and headline:** the glow (bloom) only comes up once the page is dark, and the headline turns white at the same time. This avoids a washed-out pale-blue middle state.
 - **No night stage.** There used to be a day → night video. It was removed so the city only lights up once, when the wire passes ([DECISIONS.md](DECISIONS.md)).
@@ -55,10 +63,10 @@ The story is split into **segments**. Each segment gets a length in **screens**,
 - **The avenue:** a long road along world Y at x = 228 m, with kerb lines and street-light poles on both sides every 36 m. On screen it's a lower-left → upper-right diagonal, in the place of the train in the client's reference images.
 
 ### 4. Run (`run`)
-- **The wire:** the red Tamira wire travels along the avenue at street level, with no bridge or platform. It starts off-screen at the lower-left and stops at y = 120 m. Its copper tip carries a cyan glow.
+- **The wire:** the red Tamira wire travels along the avenue at street level, with no bridge or platform. It starts off-screen at the lower-left and stops at y = 120 m. Its copper tip carries an ember-orange glow.
 - **Street lights:** each one switches on (warm amber glow, plus a pool of light on the street) the moment the tip reaches it, never before.
 - **Buildings:** light up in sync with the tip. A building lights once the tip is level with it, and buildings further from the avenue light a beat later.
-  - Lit buildings change their outline from cyan to warm and fill their facades with warm windows.
+  - Lit buildings fill their facades with golden windows. Only the windows light: outlines and walls stay as they were.
   - Each window switches on at its own moment.
   - Nothing ever lights ahead of the wire.
 - **Headline:** lifts away at the start of the run, clearing the lower-left for the wire.
@@ -77,12 +85,12 @@ This beat is fast.
 | Point in the drain | What has happened |
 |---|---|
 | ~0–25% | The whole network (lines, hulls, street lights) drains into the wire's tip: a shrinking screen-space circle with a bright leading edge. The city is gone. |
-| ~14–42% | The page goes navy → lavender (`#e4e4ee`). The text turns dark. |
+| ~14–42% | The page goes warm night → lavender (`#e4e4ee`). The text turns dark. |
 | After that | The tip lifts into the product wire's opening shape, and the camera finishes settling on the hand-over frame against the clean background. |
 
 ### 7. Hand-over (`wireIn`)
 - **The swap:** the drain ends on exactly the frame the product wire starts from. The product canvas fades in over it, and there is no visible cut.
-- **The glow:** the copper strands' cyan glow cools to copper.
+- **The glow:** the copper strands' ember glow cools to copper.
 
 ### 8–14. Product chapters
 Each chapter's copy (title, body, spec line) appears in the upper-left column. The wire and props work on the right. Each chapter gets a soft background tint.
@@ -123,7 +131,9 @@ Most retuning is a number in one of these places:
 With `npm run dev` running:
 
 ```
-?at=day:0.5          day hero
+?at=day:0.5          day hero (framed)
+?at=open:0.5         frame opening
+?at=open:0.95        full-screen city
 ?at=wireOn:0.4       day → wireframe, mid-transition
 ?at=wireOn:0.95      wireframe city
 ?at=extend:0.95      pulled-back city with the avenue
