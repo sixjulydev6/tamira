@@ -1,3 +1,7 @@
+> **Room ending:** `finale-stage.js` reuses the product renderer for the original three-wire switchboard. `room.js` paints the original desktop/portrait room images on a separate 2D canvas using the shared GSAP clock. See [ROOM-FINALE.md](ROOM-FINALE.md) for provenance and alignment.
+
+> **Current runtime:** daylight city and rise are now live Three.js; `daylight.js` shares the city renderer and a labeled GSAP timeline replaces raster frame scrubbing. See [LIVE-3D.md](LIVE-3D.md) for the current asset, camera, lifecycle and validation details. Older rendered-hero sections below are historical implementation context.
+
 # Architecture
 
 ## Files
@@ -26,11 +30,12 @@ art/                       the hero's Blender source, layout manifest and checks
 
 There is one `<section class="story">`, `(TOTAL_SCREENS + 1) × 100svh` tall. Inside it, `.story__stage` is `position: sticky`, 100svh tall. Its layers, bottom to top:
 
-1. `.hero__stage`: the day image (`<picture>` → `img.hero__poster`), a full-screen cover layer. `main.js` clips it to the hero frame (`clip-path: inset()`) and scales/moves the image so the crown sits in the frame (`layoutFrame`, `setFrame`); `open` takes both to identity. No CSS mask (and `uMaskMix` is 0). Every source must stay 16:9: `resize()` fits the camera to the image's `object-fit: cover` frame using `VIDEO_W/H` (1920×1080), which only fixes the aspect, not the resolution.
-   - `video.hero__video` inside it: the traffic loop. `setFrame` gives it the image's transform; `setTraffic` plays it after `load` while `wireOn < 1` and pauses it otherwise (and when the tab is hidden). It fades in on `playing`. Skipped on Save-Data; hidden under reduced motion.
+1. `.hero__stage`: the hero city, full screen, with **no stacking context** (no z-index, clip, transform or opacity on it), so the headline can sit between its two layers:
+   - `.hero__iso` (bottom): the isometric day image (`<picture>` → `img.hero__poster`, cover, 50% 58%) and `video.hero__video` (the traffic loop). Opacity 0 until the rise lands on it (95–100% of `rise`). `setTraffic` plays the video while `rise >= 1 && wireOn < 1`. Every source must stay 16:9: scene.js's `resize()` fits the camera to the poster's `object-fit: cover` frame using `VIDEO_W/H` (1920×1080).
+   - `.hero__rise` (z 2, above the headline): `img.hero__opening` (the street-level still, alpha) and `canvas.hero__seq` (the rise frames). `layoutRise()` sizes this layer to the 16:9 cover box (so its crop matches every other layer) and, on phones, `setRiseFit()` shrinks it to a skyline at the bottom and grows it back during the rise. `drawRise()` draws frame ⌊f⌋ and crossfades ⌊f⌋+1. Hidden once `rise >= 1`. The page-load fade animates its opacity only (render() owns its visibility).
 2. `canvas.story__canvas`: the **city** renderer (wireframe city, street lights, city wire).
 3. `canvas.story__canvas--wire`: the **product wire** renderer (chapters).
-4. `.hero__copy`: the centred hero headline, sentence and button (above the frame; fades out in `open`).
+4. `.hero__copy` (no z-index): `.hero__title` (z 1, between the isometric and street-level layers) and `.hero__aside` (z 3: sentence + button; left column from 1024px, centred under the headline on phones). Fades out over 0–20% of `rise`.
 5. `.story__copy`: one `<article class="chapter">` per chapter (built from `chapters.js`).
 6. `.story__labels`: the three pinned labels for the strands chapter.
 7. `.gauge`: the temperature gauge for the heat chapter.

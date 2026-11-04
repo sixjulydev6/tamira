@@ -14,7 +14,7 @@
 }
 
 :root {
-  --red: #ea3c32;          /* wordmark + contact accent (sampled from the reference) */
+  --red: #ea3c32;          /* contact accent (sampled from the reference); the logo carries its own #F45E5E */
   --day-bg: #ffffff;
   --night-bg: #1d222c;     /* matches the night render's edges so the video fades in seamlessly */
   --day-ink: #000000;
@@ -63,7 +63,6 @@
   --radius-xs: 2px;
 
   --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-wordmark: "Quicksand", ui-rounded, system-ui, sans-serif;
 
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -127,15 +126,12 @@ a { color: inherit; text-decoration: none; }
 
 .wordmark {
   flex-shrink: 0;
-  font-family: var(--font-wordmark);
-  font-weight: 600;
-  font-size: 1.75rem;              /* ~102px wide, the same footprint at every size */
-  line-height: 1;
-  letter-spacing: -0.01em;
-  color: var(--red);
-  /* optical: rounded caps sit slightly high next to the nav baseline */
-  padding-block: 2px 4px;
+  display: flex;
+  align-items: center;
+  min-height: 40px;                /* hit area; the logo itself is 20px tall */
 }
+/* the Tamira logo (public/tamira-logo.svg, 876 × 145, its own coral #F45E5E) */
+.wordmark img { display: block; height: 20px; width: auto; }
 
 .primary-nav { flex: 1; }
 
@@ -226,39 +222,43 @@ a { color: inherit; text-decoration: none; }
 }
 .story__canvas--wire { visibility: hidden; }   /* above the city canvas (later in the DOM) */
 
+/* The hero city, full screen. No stacking context here (no z-index, clip or transform), so the
+   headline (z 1) can sit between the isometric layer (below) and the street-level layer (z 2): the
+   tower rises in front of the words, as in the client's reference. */
 .hero__stage {
-  /* The city is one full-screen layer. main.js clips it to a frame under the headline (equal
-     margins on the page grid) and opens the clip to the whole screen on the first scroll, so the
-     wireframe hand-over always meets a full-screen cover image. The fallback clip below is the
-     framed state before the script measures the copy. */
   position: absolute;
   inset: 0;
   overflow: hidden;
-  clip-path: inset(46svh var(--hero-media-margin) 0 var(--hero-media-margin));
-  will-change: clip-path;
+}
+.hero__iso { position: absolute; inset: 0; opacity: 0; }   /* shown as the rise lands on it (main.js) */
+.hero__rise {
+  position: absolute;              /* sized and placed to the 16:9 cover box by main.js layoutRise() */
+  inset: 0;
+  z-index: 2;
+  transform-origin: 0 0;           /* phones: main.js shrinks it to a skyline at the bottom, then opens it */
 }
 
 .hero__poster,
-.hero__video {
+.hero__video,
+.hero__opening,
+.hero__seq {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 58%;
-  transform-origin: 0 0;           /* main.js scales/moves it so the crown sits centred in the frame */
-  will-change: transform;
+  object-position: 50% 58%;        /* every layer crops the 16:9 frame the same way (scene.js too) */
 }
+.hero__seq { opacity: 0; }
 /* traffic loop: starts on the poster's own frame; the short fade hides the codec's slight colour shift */
 .hero__video { opacity: 0; transition: opacity 300ms ease-out; }
 .hero__video.is-ready { opacity: 1; }
 
-/* The hero's one centred moment: headline, one sentence, one action, above the framed city
-   (never over it). The frame starts just under this block; see main.js layoutFrame(). */
+/* The hero's one centred moment: the headline, behind the tower's top. The sentence and action sit
+   to the left over the sky (.hero__aside), never over the tower. */
 .hero__copy {
   position: absolute;
-  inset: 0 0 auto 0;
-  z-index: 2;
+  inset: 0 0 auto 0;               /* no z-index: its children layer against the hero city */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -268,6 +268,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 .hero__title {
+  position: relative;
+  z-index: 1;                      /* between the isometric layer and the street-level tower */
   margin: 0;
   width: 100%;
   max-width: 49.625rem;
@@ -282,6 +284,25 @@ a { color: inherit; text-decoration: none; }
 /* the tight leading would clip descenders inside the reveal mask; pad the mask, pull the next line back */
 .hero__title .line { display: block; overflow: hidden; padding-bottom: 0.14em; margin-bottom: -0.14em; }
 .hero__title .line__inner { display: inline-block; }
+
+/* sentence + action: left column over the sky on desktop, under the headline on phones */
+.hero__aside {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+@media (min-width: 1024px) {
+  .hero__aside {
+    position: absolute;
+    left: var(--content-x);
+    top: calc(var(--hero-copy-top) + 10.5rem);   /* just under the headline, above the skyline's tops */
+    width: min(21rem, 28vw);
+    align-items: flex-start;
+    text-align: left;
+  }
+}
 
 .hero__lede {
   max-width: 49.625rem;
@@ -485,11 +506,13 @@ a { color: inherit; text-decoration: none; }
   position: relative; inset: auto;
   flex: none;
   height: max(50svh, 100svh - var(--hero-copy-h, 22rem) - var(--space) * 10);
-  margin: var(--hero-media-gap) var(--hero-media-margin) 0;
-  clip-path: none;
+  margin: var(--hero-media-gap) 0 0;
 }
-.story.is-static .hero__poster,
-.story.is-static .hero__video { transform: none; }
+/* static: the street-level still only (no rise, no isometric layer, no traffic) */
+.story.is-static .hero__iso,
+.story.is-static .hero__seq { display: none; }
+.story.is-static .hero__rise { transform: none; }
+.story.is-static .hero__aside { position: relative; left: auto; top: auto; width: auto; align-items: center; text-align: center; }
 .story.is-static .story__canvas,
 .story.is-static .story__labels,
 .story.is-static .gauge { display: none; }
@@ -587,7 +610,7 @@ a { color: inherit; text-decoration: none; }
    The source's proprietary Bureau Serif is represented by Geist Serif. */
 @media (min-width: 1024px) {
   .hero__title { font-size: 80px; line-height: 1; letter-spacing: -0.04em; }
-  .hero__lede { font-size: 24px; line-height: 1.3; min-height: 62.4px; }
+  .hero__lede { font-size: 18px; line-height: 1.45; }   /* side column now (was 24px centred) */
   .site-header { top: 3.4rem; }
   .primary-nav { position: absolute; inset-inline: 0; pointer-events: none; }
   .nav-list a { pointer-events: auto; }
@@ -598,3 +621,18 @@ a { color: inherit; text-decoration: none; }
 @media (min-width: 861px) and (max-width: 1023px) {
   .hero__title { font-size: 60px; }
 }
+
+/* Keep the heat readout above the cable/heater on portrait screens. */
+@media (max-aspect-ratio: 9/10) {
+  .gauge { bottom: 36svh; }
+}
+
+/* Original room finale: one canvas, multiresolution images and five cumulative light states. */
+.room-finale { position: absolute; inset: 0; z-index: 2; opacity: 0; visibility: hidden; overflow: hidden; pointer-events: none; }
+.room-finale canvas { display: block; width: 100%; height: 100%; }
+.room-finale::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(12,9,7,.62), rgba(12,9,7,.28) 34%, transparent 56%); }
+.room-finale::after { content: ''; position: absolute; inset: 0; background: #0b0a09; opacity: var(--room-end, 0); }
+.room-static { display: none; }
+.is-static .room-finale { display: none; }
+.is-static .room-static { display: block; margin-top: 64px; }
+.room-static img { display: block; width: 100%; height: auto; }

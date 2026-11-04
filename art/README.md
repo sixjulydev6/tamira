@@ -1,3 +1,5 @@
+> **Runtime update:** Blender renders here are now reference/fallback assets. The shipped interactive city, moving cars and camera rise are generated in `src/story/daylight.js`; no offline animation render is required for normal browsing. See `docs/LIVE-3D.md`. Existing source art has been preserved.
+
 # Hero art pipeline
 
 The day city hero (`public/media/hero-city-*`) is a Cycles render from one script. It replaces the
@@ -78,3 +80,20 @@ blender.exe -b --python animate_city.py -- <out> 128 2560 encode    # hero-traff
 - The seed is fixed, so the static city is the same in every frame; only the cars' pixels change.
 - On the team machine the whole chain runs from `renders\traffic\run_traffic.cmd` as one detached,
   below-normal-priority process. The poster then goes through the encode steps above as `hero-city-*`.
+
+## The hero's rise (street level → isometric)
+
+Same script, same scene as the traffic loop (cars frozen at loop frame 0), sky transparent:
+
+```
+blender.exe -b --python animate_city.py -- <out> 96 1600 rise          # 72 RGBA frames → <out>\rise (resumable)
+blender.exe -b --python animate_city.py -- <out> 384 3840 riseposter   # frame 0 at 3840: the opening still
+blender.exe -b --python animate_city.py -- <out> 16 1600 risewebp      # → rise_webp\, riseposter_webp\ (WebP, alpha, q80)
+```
+
+- Camera knobs: `RISE` (azimuth, camera height, distance, lens, look-at height, lens shift) and `RISE_N`.
+  The last frame is the build_city ortho camera itself, so it lands exactly on `hero-city-*`.
+- The ground fades to transparent beyond the isometric frame's furthest corner (+40 m), so the
+  street-level horizon is white sky; nothing inside the isometric frame changes.
+- Site files: `rise_webp\r_*.webp` → `public/media/rise/`; `riseposter_webp\r_0000.webp` → `public/media/hero-rise-3840.webp`
+  (and a 1920 copy, `hero-rise-1920.webp`).

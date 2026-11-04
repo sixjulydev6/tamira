@@ -15,6 +15,12 @@ Run headless (Blender 5.2):
              frames:A-B  only frames A..B
              poster  render frame 0 as hero-city.png / .jpg (the still the video starts from)
              encode  frames → hero-traffic-<w>.mp4 (H.264) and .webm (AV1) with Blender's FFmpeg
+             rise    the hero's camera move (RISE_N frames, RGBA, sky transparent) into <out_dir>/rise:
+                     street-level perspective on the crown tower → the isometric hero camera. The
+                     last frame is the exact isometric camera, so it meets the traffic loop's frame 0.
+             rise:A-B  only frames A..B (resumable like frames)
+             riseposter  rise frame 0 alone (the hero's opening still; use 3840 / 384 samples)
+             risewebp  rise/ and riseposter/ PNGs → WebP with alpha (quality 80) for the site
 
 Seamless loop: every car drives at the same speed, and a lane's traffic is one pattern repeated
 every SPEED × SECONDS metres along its route, so after one loop every car sits exactly where the
@@ -318,7 +324,120 @@ def encode():
         print("encoded", r.filepath, flush=True)
 
 
-if JOB.startswith("frames"):
+# ------------------------------------------------------------------ the hero's camera move ("rise")
+# Opening shot (client reference: a tower seen at eye level from mid-height, centred, rising into the
+# headline against white sky, its top at about a third of the frame so it overlaps the headline's
+# second line): street level on the −Y side, where the crown tower is 93% unobstructed
+# (scanned by ray casts), 50 mm lens, camera at 35 m, 430 m out, looking slightly up at z = 78 m.
+# Then one move up to the isometric hero camera (az −45°, el 38°, 400 m orthographic): azimuth,
+# elevation, target and frame width ease together while the camera dollies out and the lens
+# lengthens (a dolly-zoom), so the view flattens into the orthographic one. Last frame = exact ortho.
+RISE_N = 72                     # 72 frames over ~1.4 screens of scroll; the site crossfades neighbours
+RISE = {"az0": -90.0, "cam_z0": 35.0, "dist0": 430.0, "lens0": 50.0, "tz0": 78.0, "shift0": 0.125,
+        "far": 40000.0}
+
+
+def smooth(a, b, x):
+    t = min(1.0, max(0.0, (x - a) / (b - a))); return t * t * (3 - 2 * t)
+
+
+def rise_camera(t):
+    """camera for rise progress t (0 = street level, 1 = isometric). Returns None at t = 1 (use ortho)."""
+    cam = scene.camera.data
+    if t >= 1.0:
+        return None
+    a0 = math.radians(RISE["az0"]); el_cam = math.atan2(RISE["cam_z0"] - RISE["tz0"], RISE["dist0"])
+    D0 = math.hypot(RISE["dist0"], RISE["cam_z0"] - RISE["tz0"])
+    W0 = 36.0 * D0 / RISE["lens0"]                       # frame width at the target, sensor 36 mm
+    T0, T1 = Vector((0, 0, RISE["tz0"])), ground_at(B["REF_W"] / 2, B["REF_H"] / 2)
+    e = t * t * t * (t * (t * 6 - 15) + 10)               # smootherstep: settles into both ends
+    az = a0 + (math.radians(-45.0) - a0) * e
+    el = el_cam + (math.radians(38.0) - el_cam) * e
+    T = T0.lerp(T1, e)
+    W = math.exp(math.log(W0) + (math.log(B["S"]) - math.log(W0)) * e)
+    D = math.exp(math.log(D0) + (math.log(RISE["far"]) - math.log(D0)) * smooth(0.2, 1.0, t))
+    d = Vector((math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el)))
+    return {"loc": T + d * D, "look": T, "lens": 36.0 * D / W, "shift_y": RISE["shift0"] * (1 - e),
+            "clip": (max(1.0, D - 3000.0), D + 3000.0)}
+
+
+def apply_rise(t, iso):
+    cam = scene.camera; cd = cam.data
+    c = rise_camera(t)
+    if c is None:                                         # exactly the hero camera from build_city
+        cam.location, cam.rotation_euler = iso["loc"], iso["rot"]
+        cd.type = 'ORTHO'; cd.ortho_scale = B["S"]; cd.shift_y = 0; cd.clip_start, cd.clip_end = 1, 6000
+        return
+    cd.type = 'PERSP'; cd.sensor_fit = 'HORIZONTAL'; cd.sensor_width = 36
+    cd.lens = c["lens"]; cd.shift_y = c["shift_y"]; cd.clip_start, cd.clip_end = c["clip"]
+    cam.location = c["loc"]
+    cam.rotation_euler = (c["look"] - c["loc"]).to_track_quat('-Z', 'Y').to_euler()
+
+
+def fade_far_ground():
+    """the empty ground beyond the isometric frame fades to transparent, so the street-level shot's
+    horizon is white sky (render setting only; the isometric frame itself is unaffected)"""
+    from bpy_extras.object_utils import world_to_camera_view
+    corners = [ground_at(x, y) for x in (0, B["REF_W"]) for y in (0, B["REF_H"])]
+    r0 = max(c.length for c in corners) + 40.0           # nothing the isometric frame shows fades
+    m = M["ground"]; nt = m.node_tree
+    out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    geo = nt.nodes.new("ShaderNodeNewGeometry"); sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    vm = nt.nodes.new("ShaderNodeVectorMath"); vm.operation = 'LENGTH'
+    cxy = nt.nodes.new("ShaderNodeCombineXYZ")
+    mr = nt.nodes.new("ShaderNodeMapRange"); mr.inputs["From Min"].default_value = r0; mr.inputs["From Max"].default_value = r0 + 320.0
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent"); mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(geo.outputs["Position"], sep.inputs[0])
+    nt.links.new(sep.outputs["X"], cxy.inputs["X"]); nt.links.new(sep.outputs["Y"], cxy.inputs["Y"])
+    nt.links.new(cxy.outputs[0], vm.inputs[0]); nt.links.new(vm.outputs["Value"], mr.inputs["Value"])
+    nt.links.new(mr.outputs["Result"], mix.inputs["Fac"])
+    nt.links.new(bsdf.outputs[0], mix.inputs[1]); nt.links.new(tr.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    print(f"ground fades out from {r0:.0f} m to {r0 + 320:.0f} m", flush=True)
+
+
+def render_rise(a, b, sub="rise"):
+    iso = {"loc": scene.camera.location.copy(), "rot": scene.camera.rotation_euler.copy()}
+    fade_far_ground()
+    scene.render.film_transparent = True                 # sky = the page; the headline sits behind it
+    scene.frame_set(0)                                   # traffic frozen at loop frame 0
+    d = os.path.join(OUT, sub); os.makedirs(d, exist_ok=True)
+    s = scene.render.image_settings
+    s.file_format = 'PNG'; s.color_mode = 'RGBA'; s.color_depth = '8'; s.compression = 15
+    for f in range(a, b + 1):
+        fp = os.path.join(d, f"r_{f:04d}.png")
+        if os.path.exists(fp): continue
+        apply_rise(f / (RISE_N - 1), iso)
+        scene.render.filepath = fp
+        bpy.ops.render.render(write_still=True)
+        print("rise", f, "done", flush=True)
+
+
+def rise_webp(quality=80):
+    """rise PNGs → WebP with alpha (what the site loads), no colour management on the way (bytes stay sRGB)"""
+    import glob
+    for sub in ("rise", "riseposter"):
+        src = sorted(glob.glob(os.path.join(OUT, sub, "r_*.png")))
+        dst = os.path.join(OUT, sub + "_webp"); os.makedirs(dst, exist_ok=True)
+        for fp in src:
+            im = bpy.data.images.load(fp)
+            im.pixels[0]                                  # images load lazily: read the buffer before re-pointing it
+            im.filepath_raw = os.path.join(dst, os.path.basename(fp)[:-4] + ".webp")
+            im.file_format = 'WEBP'
+            im.save(quality=quality)
+            bpy.data.images.remove(im)
+        print("webp", sub, len(src), flush=True)
+
+
+if JOB == "risewebp":
+    rise_webp()
+elif JOB.startswith("rise") and JOB != "riseposter":
+    a, b = (map(int, JOB.split(":")[1].split("-")) if ":" in JOB else (0, RISE_N - 1))
+    render_rise(a, b)
+elif JOB == "riseposter":
+    render_rise(0, 0, sub="riseposter")
+elif JOB.startswith("frames"):
     a, b = (map(int, JOB.split(":")[1].split("-")) if ":" in JOB else (0, N - 1))
     render_frames(a, b)
 elif JOB == "poster":

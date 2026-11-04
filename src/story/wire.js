@@ -25,7 +25,7 @@ const STRAND_LAYOUT = (() => {
 })();
 
 export class Wire {
-  constructor() {
+  constructor({ color = "#c21d19", capColor = "#d2453c" } = {}) {
     this.group = new THREE.Group();
     this.samples = null;
     this.length = 1;
@@ -40,7 +40,7 @@ export class Wire {
     // jacket
     this.jacketGeo = tubeGeometry(JACKET_SEG, JACKET_RAD);
     const jacketMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, map: legendTexture(), roughness: 0.4, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity: 0.7,
+      color: 0xffffff, map: legendTexture(color), roughness: 0.4, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity: 0.7,
       side: THREE.DoubleSide,
     });
     jacketMat.onBeforeCompile = (shader) => patchJacket(shader, this.jacketUniforms);
@@ -50,7 +50,7 @@ export class Wire {
 
     // cut face of the jacket where it was stripped
     this.cap = new THREE.Mesh(new THREE.RingGeometry(R_CORE + 0.02, R_JACKET, 48, 1),
-      new THREE.MeshStandardMaterial({ color: 0xd2453c, roughness: 0.6, side: THREE.DoubleSide }));
+      new THREE.MeshStandardMaterial({ color: capColor, roughness: 0.6, side: THREE.DoubleSide }));
     this.group.add(this.cap);
 
     // copper
@@ -229,12 +229,12 @@ function strandsGeometry() {
 }
 
 /* red jacket with the printed legend running along it; the text sits on the side facing the camera */
-function legendTexture() {
+function legendTexture(color = "#c21d19") {
   const c = document.createElement("canvas");
   // proportioned like the surface it wraps: TEXT_REPEAT long by 2π·R around (≈ 2 : 1)
   c.width = 2048; c.height = Math.round(2048 * (2 * Math.PI * R_JACKET) / TEXT_REPEAT);
   const g = c.getContext("2d");
-  g.fillStyle = "#c21d19"; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = "rgba(255, 232, 224, 0.62)";
   g.font = "500 58px 'Instrument Sans', ui-sans-serif, system-ui, sans-serif";
   g.textBaseline = "middle";

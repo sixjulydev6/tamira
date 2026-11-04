@@ -4,3 +4,6 @@ dist
 
 # client review recordings (large, not part of the site)
 assets/vids/
+
+# Local browser verification artifacts
+.taste-skill/

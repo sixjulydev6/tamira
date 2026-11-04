@@ -5,9 +5,12 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { buildCity, FRAME_CENTRE, FRAME_W, AVENUE } from "./city.js";
+import { buildDaylightCity } from "./daylight.js";
+import { createFinaleStage } from "./finale-stage.js";
+import { finaleU } from "./finale-timing.js";
 import { Wire } from "./wire.js";
 import { buildProps } from "./props.js";
-import { local, smooth, lerp, windowed, clamp01 } from "./timeline.js";
+import { local, smooth, lerp, windowed, clamp01, progressOf } from "./timeline.js";
 
 const VIDEO_W = 1920, VIDEO_H = 1080;
 const DEG = Math.PI / 180;
@@ -29,7 +32,7 @@ const EXT_FRAME_W = 780;                             // metres across the pulled
 
 export function createStory({ canvas, wireCanvas, stage, media }) {
   const makeRenderer = (el) => {
-    const r = new THREE.WebGLRenderer({ canvas: el, antialias: true, alpha: false, powerPreference: "high-performance" });
+    const r = new THREE.WebGLRenderer({ canvas: el, antialias: true, alpha: true, powerPreference: "high-performance" });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     r.outputColorSpace = THREE.SRGBColorSpace;
     return r;
@@ -64,8 +67,14 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
      (Z up, metres). Lights and reflections are the product scene's, rotated by the same mapping
      M used for the hand-over (product x → city +Y, product y → city +Z, product z → city +X),
      so at the hand-over both renders are the same picture. */
+  const environmentTargets = [];
+  function environmentFor(renderer) {
+    const generator = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment();
+    const target = generator.fromScene(room, 0.04);
+    generator.dispose(); room.dispose(); environmentTargets.push(target); return target.texture;
+  }
   const cityWireScene = new THREE.Scene();
-  cityWireScene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  cityWireScene.environment = environmentFor(renderer);
   cityWireScene.environmentIntensity = 0.85;
   cityWireScene.environmentRotation.setFromRotationMatrix(new THREE.Matrix4().set(0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1));
   { const k = new THREE.DirectionalLight(0xffffff, 2.2); k.position.set(12, -6, 10); cityWireScene.add(k);
@@ -75,14 +84,20 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   cityWireScene.add(cityWire.group);
   const FACING_X = new THREE.Vector3(1, 0, 0);
 
+  const daylight = buildDaylightCity(renderer);
+  daylight.scene.environment = cityWireScene.environment;
+  daylight.scene.environmentIntensity = 0.25;
+  let lastProgress = 0, lastBgColor = "#ffffff", trafficTime = 0;
+
   /* ---------------------------------------------------------------- product wire world */
   const wireScene = new THREE.Scene();
-  wireScene.environment = new THREE.PMREMGenerator(wireRenderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  wireScene.environment = environmentFor(wireRenderer);
   wireScene.environmentIntensity = 0.85;
   const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(-6, 10, 12); wireScene.add(key);
   const rim = new THREE.DirectionalLight(0xdfe6ff, 1.1); rim.position.set(8, -4, -6); wireScene.add(rim);
   const wire = new Wire();
   wireScene.add(wire.group);
+  let finaleStage = null;
   const props = buildProps();
   wireScene.add(props.group);
   const wireCam = new THREE.PerspectiveCamera(28, 1, 0.5, 600);
@@ -224,7 +239,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     let pts = shapeWorld.entry;
     const toElbow = smooth(0.05, 0.45, L("flex"));
     const toWave = smooth(0.0, 0.3, L("heat"));
-    const toFinale = smooth(0.0, 0.45, L("finale"));
+    const toFinale = 0; // The same cable continues into the terminal in finale-stage.
     if (toFinale > 0) pts = mixShape("wave", "finale", toFinale);
     else if (toWave > 0) pts = mixShape("elbow", "wave", toWave);
     else if (toElbow > 0) pts = mixShape("entry", "elbow", toElbow);
@@ -277,7 +292,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       m.scale.setScalar(1.4 + t * 4.5);
     });
 
-    const plateIn = smooth(0.2, 0.55, L("finale"));
+    const plateIn = 0;
     props.plate.visible = plateIn > 0.002;
     const tip = toWorld(SHAPES.finale[5]);
     props.plate.position.set(tip.x + 0.4, tip.y + 0.6, 1.6 + (1 - plateIn) * 8);
@@ -304,7 +319,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     blendTo(poses.wide, smooth(0, 0.3, L("flex")));
     blendTo(poses.flame, smooth(0, 0.35, L("flame")));
     blendTo(poses.smoke, smooth(0, 0.5, L("smoke")));
-    blendTo(poses.wide, smooth(0, 0.45, L("finale")));
+
     wireCam.position.copy(camPos);
     wireCam.lookAt(camLook);
   }
@@ -312,7 +327,22 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   /* label anchors in screen px, for the strands chapter */
   const project = (v) => { const q = v.clone().project(wireCam); return { x: (q.x * 0.5 + 0.5) * W, y: (-q.y * 0.5 + 0.5) * H, z: q.z }; };
 
+  function renderDay(p) {
+    const wireOn = local(p, "wireOn");
+    daylight.placeCamera(local(p, "rise"), frame, W, H);
+    daylight.setOpacity(1 - smooth(0.05, 0.7, wireOn));
+    daylight.traffic(trafficTime);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.setClearColor(lastBgColor, 0);
+    if (wireOn > 0) { renderer.autoClear = false; renderer.clearDepth(); }
+    renderer.render(daylight.scene, daylight.camera);
+    renderer.autoClear = true;
+    renderer.toneMappingExposure = 1;
+  }
+
   function update(p, { bg }) {
+    lastProgress = p; lastBgColor = bg;
     const bgCol = new THREE.Color(bg);          // already in linear working space (ColorManagement)
     shared.uBg.value.copy(bgCol);
     renderer.setClearColor(bgCol);
@@ -353,7 +383,19 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
         renderer.autoClear = true;
       }
     }
-    if (showWire) {
+    if (wireOn < 0.7 && wireIn === 0) renderDay(p);
+    const finale = local(p, "finale");
+    if (!finaleStage && (local(p, "smoke") > .25 || finale > 0)) finaleStage = createFinaleStage(wireRenderer, wireScene, wire);
+    if (showWire && finale > 0) {
+      // Reconstruct the smoke endpoint on every seek/resize, so reverse scrolling is identical.
+      finaleStage.hide();
+      wireState(progressOf('smoke',1));
+      const stage = finaleStage.update(finaleU(p), W, H, wireCam, shapeWorld.wave);
+      wireRenderer.toneMapping = THREE.NeutralToneMapping;
+      wireRenderer.render(stage.scene, stage.camera);
+    } else if (showWire) {
+      finaleStage?.hide();
+      wireRenderer.toneMapping = THREE.NeutralToneMapping;
       wireState(p);
       wireRenderer.render(wireScene, wireCam);
       const jEnd = wire.jacketEnd;
@@ -374,5 +416,32 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   wire.setPath(shapeWorld.entry); wire.update();
   wireRenderer.compile(wireScene, wireCam);
 
-  return { update, resize };
+  let disposed = false;
+  function dispose() {
+    if (disposed) return; disposed = true;
+    const geometry = new Set(), material = new Set(), texture = new Set();
+    for (const scene of [cityScene, cityWireScene, wireScene]) {
+      if (scene.environment) texture.add(scene.environment);
+      scene.traverse(o => {
+        if (o.geometry) geometry.add(o.geometry);
+        for (const m of Array.isArray(o.material) ? o.material : o.material ? [o.material] : []) {
+          material.add(m);
+          for (const value of Object.values(m)) if (value?.isTexture) texture.add(value);
+        }
+        if (o.isInstancedMesh) o.dispose();
+      });
+    }
+    geometry.forEach(g => g.dispose()); material.forEach(m => m.dispose()); texture.forEach(t => t.dispose());
+    finaleStage?.dispose();
+    daylight.dispose(); environmentTargets.forEach(target => target.dispose());
+    composer.passes.forEach(pass => pass.dispose?.()); composer.dispose(); renderer.dispose(); wireRenderer.dispose();
+  }
+  return {
+    update, resize, dispose,
+    tick(delta) {
+      if (disposed || local(lastProgress, "wireOn") > 0 || document.hidden) return;
+      trafficTime += Math.min(delta, 0.05); renderDay(lastProgress);
+    },
+    diagnostics: () => ({ ...daylight.stats, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, progress: lastProgress, finale: finaleStage?.diagnostics() }),
+  };
 }

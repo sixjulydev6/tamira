@@ -6,10 +6,11 @@ Marketing site for **Tamira**, a wiring and cable company. Built by Sixjuly.
 
 The homepage is a single scroll-driven story.
 
-1. An isometric **day city** turns into a glowing orange **wireframe network** on a warm night.
+1. A live **street-level clay city** rises into an isometric view, then turns into a glowing orange **wireframe network** on a warm night.
 2. A red single-core **house wire** runs along an avenue through it. The street lights and buildings light up behind its tip as it passes.
 3. The camera pushes in on the wire, the city drains away into its tip, and the page turns light.
-4. The same wire then tells the product story: copper, strands, flex, heat, flame, smoke, and a finale.
+4. The same wire tells the product story: copper, strands, flex, heat, flame and smoke.
+5. Three wires seat in the original five-switch board; the camera travels into the original living room and its five lighting groups switch on. See [docs/ROOM-FINALE.md](docs/ROOM-FINALE.md).
 
 The other site sections (Consumers, Industries, Investors, Company) come in a later stage.
 
@@ -38,7 +39,8 @@ The site is plain HTML, CSS and JavaScript, with no framework. Versions are pinn
 | GSAP + ScrollTrigger | 3.12.5 | the one scroll timeline and the page-load reveal |
 | Three.js | 0.170.0 | the wireframe city and the wire, all live 3D |
 
-Three.js and the 3D scene are built as a separate chunk of about 146 KB gzipped. It loads after first paint, so the hero never waits for it. The only media the hero loads is one image: `public/media/hero-city-*`, AVIF/WebP/JPG at 1920, 2560 and 3840 wide. It is rendered from `art/blender/build_city.py`; see [art/README.md](art/README.md).
+Three.js and the story scene are lazy-loaded after first paint. The city, camera rise, moving traffic, wireframe and product interactions are now live Three.js geometry controlled by GSAP. One transparent opening still remains for first paint and fallback; no rendered rise sequence or traffic video is requested. The ending deliberately uses the original rendered room images for an exact room match. See [docs/LIVE-3D.md](docs/LIVE-3D.md) for implementation and checks. The older Blender sources and renders remain in `art/` and `public/media/` as references.
+
 
 ## Documentation
 

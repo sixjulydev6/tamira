@@ -1,3 +1,5 @@
+> **Live rendering:** the daylight city uses beveled Three.js geometry, satin PBR materials, environment lighting and directional shadows. Physical scene shadows are intentional. Hero typography, composition and grid remain unchanged. See [LIVE-3D.md](LIVE-3D.md).
+
 # Design system
 
 ## Grid
@@ -14,14 +16,14 @@ The layout, spacing and type metrics are adapted from **arrakis.tech**. They wer
 | `--header-height` | 64px, 86px from 640px | |
 
 ### Header
-- **Height and alignment:** 64 / 86px tall, contents centred vertically. Side edges are `--content-x`: the wordmark starts and the Contact button (or the phone Menu) ends on the framed city's edges.
-- **Wordmark:** fixed at about 102px wide (1.75rem Quicksand). 64px gap to the nav.
+- **Height and alignment:** 64 / 86px tall, contents centred vertically. Side edges are `--content-x`: the logo starts and the Contact button (or the phone Menu) ends on the framed city's edges.
+- **Logo:** the client's SVG (`public/tamira-logo.svg`, 876 × 145, coral `#F45E5E`), 20px tall (~121px wide), in a link at least 40px tall.
 - **Nav:** Consumers, Industries, Investors, Company, with 48px between items.
 - **Contact us:** an outlined red button on the far right (2px radius, padding 9 × 14px). It's outlined rather than filled because white text on the red is under 4.5:1 contrast at nav size.
 - **Below 1024px:** the nav collapses into a "Menu" dropdown.
 
 ### Composition rule: words left, object right
-- **Hero (the one exception):** headline, one sentence and one button are centred under the header, above the framed city, never over it. It is the page's one centred moment (taste-skill: centre at most one moment). The frame uses the page grid's side margins and runs to the bottom of the viewport (client request); its top is the copy's bottom plus 24–48px.
+- **Hero (the one exception):** the headline is centred under the header, and the street-level crown tower rises in front of its second line (client reference, DECISIONS 20); the picture is full bleed with a white sky. It is the page's one centred moment. The sentence and button sit in the left column (`--content-x`) over the sky, never over the tower; on phones they are centred under the headline and the skyline sits along the bottom.
 - **Hero button:** flat ink fill, white text, 2px radius, 44px tall. Ink rather than red because white on the brand red is under 4.5:1 at this size.
 - **Chapter copy:** upper-left, in a column about 31rem wide: title, then body, then a spec line.
 - **The visual** (city, wire, props) works in the right two-thirds. Copy never centres over the object.
@@ -29,12 +31,11 @@ The layout, spacing and type metrics are adapted from **arrakis.tech**. They wer
 
 ## Type
 
-Fonts are **stand-ins** until the client supplies the real logo and brand font:
+Fonts are **stand-ins** until the client supplies a brand font (the logo is final, see the header):
 - **Geist Serif** (400, `--font-serif`) for every heading: the hero headline, chapter titles, the Contact title and the gauge number. Vercel's open-source serif (SIL OFL), self-hosted as `public/fonts/GeistSerifVF.woff2` (40 KB, preloaded) because it isn't on Google Fonts. Licence: `public/fonts/GeistSerif-OFL.txt`.
 - **Instrument Sans** (400 / 500) for UI and copy.
-- **Quicksand 600** for the wordmark.
 
-Instrument Sans and Quicksand come from Google Fonts.
+Instrument Sans comes from Google Fonts.
 
 ### Fluid scale
 Each size runs linearly from a 480px to a 1280px viewport, then holds.
@@ -68,7 +69,8 @@ Each size runs linearly from a 480px to a 1280px viewport, then holds.
 
 | Name | Value | Where |
 |---|---|---|
-| Accent red | `#ea3c32` | wordmark, Contact button, end CTA (sampled from the client reference) |
+| Accent red | `#ea3c32` | Contact button, end CTA (sampled from the client reference) |
+| Logo coral | `#F45E5E` | inside the logo SVG only |
 | Day page | `#ffffff` | hero |
 | Warm night | `#140b07` | wireframe city (was navy `#060d1f`; DECISIONS 17) |
 | Wireframe line | `#e8582a` (crown orange), hot `#ffc69c` (peach) | city lines (additive, with bloom); building hulls lift toward warm. Building outlines are thick strips (1.2 px, crown 1.4, extended city 1.0, plus a 0.5 px soft edge); interior grids are faint 1 px lines |

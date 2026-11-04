@@ -5,8 +5,8 @@
    ------------------------------------------------------------------ */
 
 export const SEGMENTS = [
-  { id: "day",     screens: 0.35 }, // the day city in its frame under the headline, held: a short beat before anything moves
-  { id: "open",    screens: 1.2 },  // the headline lifts away and the frame opens to the full screen: the immersive city
+  { id: "day",     screens: 0.35 }, // street level: the crown tower rising into the headline, held: a short beat before anything moves
+  { id: "rise",    screens: 1.6 },  // the copy lifts away; the camera rises from street level to the isometric view (rendered frames)
   { id: "wireOn",  screens: 1.2 },  // day → wireframe: orange lines draw on over the render's edges, page white → warm night
   { id: "extend",  screens: 1.4 },  // camera pulls back; more city grows in around a street-lit avenue
   { id: "run",     screens: 2.2 },  // the wire runs along the avenue; street lights switch on as its tip passes
@@ -19,7 +19,8 @@ export const SEGMENTS = [
   { id: "heat",    screens: 1.9 },
   { id: "flame",   screens: 1.7 },
   { id: "smoke",   screens: 1.3 },
-  { id: "finale",  screens: 1.7 },
+  { id: "finale",  screens: 4.0 }, // single cable connection and original camera arc to the front
+  { id: "room",    screens: 3.0 }, // original room pullback, five lighting steps, fade to close
 ];
 
 export const TOTAL_SCREENS = SEGMENTS.reduce((sum, s) => sum + s.screens, 0);

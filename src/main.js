@@ -1,13 +1,14 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { TOTAL_SCREENS, local, smooth, windowed, lerp, progressOf } from "./story/timeline.js";
+import { SEGMENTS, TOTAL_SCREENS, local, smooth, windowed, lerp, progressOf } from "./story/timeline.js";
+import { createRoom } from "./story/room.js";
+import { finaleU } from "./story/finale-timing.js";
 import { pageColors } from "./story/palette.js";
 import { CHAPTERS, LABELS, GAUGE } from "./story/chapters.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
 const root = document.documentElement;
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ------------------------------------------------------------------ mobile menu */
 const nav = document.querySelector(".primary-nav");
@@ -49,34 +50,46 @@ for (const t of document.querySelectorAll(".gauge__tick"))
 
 /* ------------------------------------------------------------------ static fallback (reduced motion, or no WebGL) */
 const storyEl = document.querySelector(".story");
+let staticResize = null;
 function goStatic() {
+  if (staticResize) window.removeEventListener("resize", staticResize);
   storyEl.classList.add("is-static");
   root.classList.add("is-static");
   const copy = document.querySelector(".hero__copy");
-  const fit = () => root.style.setProperty("--hero-copy-h", `${copy.offsetHeight}px`);
+  const fit = () => { if (storyEl.classList.contains("is-static")) root.style.setProperty("--hero-copy-h", `${copy.offsetHeight}px`); };
+  staticResize = fit;
   fit(); window.addEventListener("resize", fit); document.fonts?.ready.then(fit);
   root.style.removeProperty("--story-screens");
-  for (const c of chapterEls) { c.el.style.opacity = ""; c.el.style.translate = ""; }
+  for (const selector of [".hero__stage", ".hero__rise", ".hero__copy"]) {
+    const el = document.querySelector(selector); el.style.opacity = "1"; el.style.visibility = "visible"; el.style.translate = "";
+  }
+  for (const c of chapterEls) { c.el.style.opacity = ""; c.el.style.translate = ""; c.el.style.visibility = ""; }
 }
 
-if (reduceMotion) {
-  goStatic();
-} else {
-  runStory();
-}
+const motion = gsap.matchMedia();
+motion.add({ animate: "(prefers-reduced-motion: no-preference)", reduce: "(prefers-reduced-motion: reduce)" }, context => {
+  if (context.conditions.reduce) { goStatic(); return () => { window.removeEventListener("resize", staticResize); staticResize = null; }; }
+  return runStory();
+});
+if (import.meta.hot) import.meta.hot.dispose(() => motion.revert());
 
 function runStory() {
+  root.classList.remove("is-static"); storyEl.classList.remove("is-static");
   root.style.setProperty("--story-screens", String(TOTAL_SCREENS + 1));
+  let disposed = false;
+  const room = createRoom(document.querySelector(".room-finale"));
 
   /* page-load moment (once) */
   gsap.timeline({ defaults: { ease: "expo.out" } })
     .from(".site-header", { autoAlpha: 0, y: -8, duration: 0.6 })
     .from(".hero__title .line__inner", { yPercent: 105, duration: 1.0, stagger: 0.1 }, 0.1)
     .from(".hero__lede, .hero__cta", { autoAlpha: 0, y: 16, duration: 0.8, stagger: 0.08 }, 0.3)
-    .from(".hero__stage", { autoAlpha: 0, duration: 1.2, ease: "power2.out" }, 0.15);   // opacity only: scene.js measures this box
+    .from(".hero__rise", { opacity: 0, duration: 1.2, ease: "power2.out" }, 0.15);   // opacity only (render() owns its visibility); not the stage, whose opacity would lift the headline over the tower
 
-  /* the hero is the day render, held still; the first scroll turns it into the wireframe */
+  /* Live street-level city → isometric daylight → wireframe; stills are fallbacks only. */
   const dayImage = document.querySelector(".hero__poster");
+  const isoLayer = document.querySelector(".hero__iso");
+  const riseLayer = document.querySelector(".hero__rise");
   const heroStage = document.querySelector(".hero__stage");
   const heroCopy = document.querySelector(".hero__copy");
   const canvas = document.querySelector(".story__canvas");
@@ -86,76 +99,28 @@ function runStory() {
   /* 3D: loaded after first paint, so the hero never waits for it */
   let story = null;
   const load = () => import("./story/scene.js").then(({ createStory }) => {
+    if (disposed) return;
     try {
       story = createStory({ canvas, wireCanvas, stage: heroStage, media: dayImage });
       render(state.p);
+      storyEl.classList.add("is-live-3d");
     } catch (err) {
       console.warn("3D unavailable, showing the static story", err);
-      goStatic();
+      master.scrollTrigger?.kill(); master.pause(); goStatic();
     }
-  });
+  }).catch(err => { if (!disposed) { console.warn("3D failed to load", err); master.scrollTrigger?.kill(); master.pause(); goStatic(); } });
   if ("requestIdleCallback" in window) requestIdleCallback(load, { timeout: 1500 }); else setTimeout(load, 300);
 
   const state = { p: 0 };
   let lastBg = "";
 
-  /* ---------------------------------------------------------------- the frame
-     The city layer is full screen. At rest it is clipped to a frame under the headline (equal
-     side margins on the page grid, running to the bottom of the viewport) and the image is scaled and
-     moved so the crown tower sits in the middle of that frame. "open" eases both to identity, so the
-     wireframe hand-over (scene.js) always meets the full-screen cover image it is aligned to. */
-  const CROWN = { x: 0.5, top: 0.115 };  // crown tower: centre line and the top of its star, in the 16:9 render
-  let frame = null;
-  function layoutFrame() {
-    const sw = heroStage.clientWidth, sh = heroStage.clientHeight;
-    const heroStyle = getComputedStyle(heroCopy);
-    const margin = sw >= 1024 ? Math.max(16, (sw - (sh - 112) * 1696 / 1024) / 2) : 16;
-    const copyBottom = heroCopy.offsetTop + heroCopy.offsetHeight;        // layout box: ignores the scroll lift
-    const gap = parseFloat(heroStyle.getPropertyValue("--hero-media-gap")) * parseFloat(getComputedStyle(root).fontSize);
-    const top = Math.min(copyBottom + gap, Math.max(copyBottom + 24, sh - 120));                     // keep a usable frame on short screens
-    const F = { l: margin, t: top, r: sw - margin, b: sh };                // runs to the bottom of the viewport
-    // the image's cover box inside the full-screen layer, at its object-position
-    const [opx, opy] = getComputedStyle(dayImage).objectPosition.split(" ").map((v) => parseFloat(v) / 100);
-    const k = Math.max(sw / 1920, sh / 1080), dw = 1920 * k, dh = 1080 * k;
-    const cx = (sw - dw) * opx + CROWN.x * dw, cTop = (sh - dh) * opy + CROWN.top * dh;
-    // smallest scale at which the (scaled) layer still covers the frame; the crown is centred
-    // across it with its whole star inside the top edge (the front towers already hide its base)
-    const fw = F.r - F.l, fh = F.b - F.t;
-    const s0 = Math.min(1, Math.max(fw / sw, fh / sh));
-    const pad = Math.max(20, fh * 0.07);
-    let tx = (F.l + fw / 2) - s0 * cx, ty = (F.t + pad) - s0 * cTop;
-    tx = Math.min(F.l, Math.max(F.r - s0 * sw, tx));
-    ty = Math.min(F.t, Math.max(F.b - s0 * sh, ty));
-    frame = { sw, sh, F, s0, tx, ty };
-  }
-  function setFrame(k) {     // k: 0 = framed, 1 = full screen
-    if (!frame) layoutFrame();
-    const { sw, sh, F, s0, tx, ty } = frame, u = 1 - k;
-    heroStage.style.clipPath = `inset(${(F.t * u).toFixed(2)}px ${((sw - F.r) * u).toFixed(2)}px ${((sh - F.b) * u).toFixed(2)}px ${(F.l * u).toFixed(2)}px)`;
-    const sc = lerp(s0, 1, k);
-    const tf = `translate3d(${(tx * u).toFixed(2)}px, ${(ty * u).toFixed(2)}px, 0) scale(${sc.toFixed(5)})`;
-    dayImage.style.transform = tf;
-    if (traffic) traffic.style.transform = tf;
-  }
-
-  /* ---------------------------------------------------------------- the traffic loop
-     Cars driving the streets (art/blender/animate_city.py). Same camera and city as the poster, and
-     its first frame is the poster, so it simply fades in over it. Loaded after first paint, skipped on
-     Save-Data, and played only while the city is on screen (paused once the wireframe takes over). */
-  const traffic = navigator.connection?.saveData ? null : document.querySelector(".hero__video");
-  let trafficWanted = false;
-  if (traffic) {
-    traffic.addEventListener("playing", () => traffic.classList.add("is-ready"), { once: true });
-    const start = () => { traffic.preload = "auto"; setTraffic(trafficWanted); };
-    window.addEventListener("load", () => setTimeout(start, 200), { once: true });
-    document.addEventListener("visibilitychange", () => setTraffic(trafficWanted));
-  }
-  function setTraffic(on) {
-    trafficWanted = on;
-    if (!traffic || traffic.preload !== "auto") return;
-    if (on && !document.hidden) traffic.play().catch(() => {});   // autoplay refused: the poster stays
-    else traffic.pause();
-  }
+  // The day city, camera rise and traffic are live meshes in the existing city renderer.
+  // Still images remain visible only until WebGL is ready, or in the static fallback.
+  const animateTraffic = (_time, deltaMs) => {
+    if (story && !storyEl.classList.contains("is-static")) story.tick(deltaMs / 1000);
+    if (!storyEl.classList.contains("is-static")) room.update(state.p);
+  };
+  gsap.ticker.add(animateTraffic);
 
   function render(p) {
     const { bg, ink, dark } = pageColors(p);
@@ -167,11 +132,11 @@ function runStory() {
     }
     root.classList.toggle("is-dark", dark);
 
-    // the framed city opens to the full screen while the headline lifts away; then it holds, immersive
-    const open = local(p, "open");
-    // the copy is gone before the frame's top edge reaches it, so nothing ever sits over the words
-    setFrame(smooth(0.14, 0.85, open));
-    const lift = smooth(0.0, 0.2, open);
+    // the copy lifts away, and the camera rises from street level to the isometric view
+    const rise = local(p, "rise");
+    riseLayer.style.visibility = story ? "hidden" : "visible";
+    isoLayer.style.opacity = "0";
+    const lift = smooth(0.0, 0.2, rise);
     heroCopy.style.opacity = String(1 - lift);
     heroCopy.style.translate = `0 ${(-lift * 24).toFixed(1)}px`;
     heroCopy.style.visibility = lift >= 1 ? "hidden" : "";
@@ -181,8 +146,8 @@ function runStory() {
     const wireOn = local(p, "wireOn");
     heroStage.style.opacity = String(1 - smooth(0.3, 0.6, wireOn));
     heroStage.style.visibility = wireOn >= 1 ? "hidden" : "";
-    if ((wireOn < 1) !== trafficWanted) setTraffic(wireOn < 1);
-    canvas.style.opacity = String(smooth(0.1, 0.42, wireOn));
+    canvas.style.opacity = story ? "1" : "0";
+    canvas.style.zIndex = wireOn > 0 ? "1" : "2";
     // hand-over: the product wire's canvas fades in over an identical frame of the city wire
     const wireIn = local(p, "wireIn");
     wireCanvas.style.opacity = String(smooth(0, 0.4, wireIn));
@@ -192,12 +157,13 @@ function runStory() {
     // chapter copy
     for (const c of chapterEls) {
       const t = local(p, c.id);
-      const a = c.id === "finale" ? smooth(0.42, 0.62, t) : windowed(t, 0.08, 0.24, 0.8, 0.94);
+      const a = c.id === "finale" ? windowed(finaleU(p), 7.48, 7.54, 7.68, 7.74) : windowed(t, 0.08, 0.24, 0.8, 0.94);
       c.el.style.opacity = a.toFixed(3);
       c.el.style.translate = `0 ${((1 - smooth(0.08, 0.3, t)) * 18).toFixed(1)}px`;
       c.el.style.visibility = a > 0.001 ? "visible" : "hidden";
     }
 
+    room.update(p);
     let anchors = null;
     if (story) anchors = story.update(p, { bg }).anchors;
 
@@ -221,30 +187,56 @@ function runStory() {
     gauge.el.classList.toggle("is-past", temp > GAUGE.ordinary);
   }
 
-  gsap.to(state, {
-    p: 1,
-    ease: "none",
+  // One labeled GSAP timeline owns all story progress. Scrubbing backward is deterministic.
+  const master = gsap.timeline({
+    defaults: { ease: "none" },
     onUpdate: () => render(state.p),
-    scrollTrigger: {
-      trigger: storyEl,
-      start: "top top",
-      end: "bottom bottom",
-      scrub: 0.6,            // smooths wheel steps into continuous motion
-    },
+    scrollTrigger: { id: "tamira-story", trigger: storyEl, start: "top top", end: "bottom bottom", scrub: 0.6 },
   });
-
-  window.addEventListener("resize", () => { layoutFrame(); story?.resize(); render(state.p); });
-  document.fonts?.ready.then(() => { layoutFrame(); render(state.p); });   // the copy's height depends on the web font
+  let elapsed = 0;
+  for (const segment of SEGMENTS) {
+    master.addLabel(segment.id, elapsed);
+    elapsed += segment.screens;
+    master.to(state, { p: elapsed / TOTAL_SCREENS, duration: segment.screens });
+  }
+  const resize = () => { story?.resize(); render(state.p); };
+  window.addEventListener("resize", resize);
+  document.fonts.ready.then(() => { if (!disposed) { resize(); ScrollTrigger.refresh(); } });
+  const lost = event => { event.preventDefault(); storyEl.classList.remove("is-live-3d"); master.scrollTrigger?.kill(); master.pause(); goStatic(); };
+  canvas.addEventListener("webglcontextlost", lost);
+  wireCanvas.addEventListener("webglcontextlost", lost);
   render(0);
 
   // dev only: ?at=segment:t jumps to a moment in the story (e.g. ?at=heat:0.6) for review
   if (import.meta.env.DEV) {
+    window.__tamira = {
+      diagnostics: () => ({ ...story?.diagnostics(), room: room.diagnostics() }),
+      seek: (segment, t = 0.5) => {
+        const p = progressOf(segment, t);
+        if (!Number.isFinite(p)) return;
+        master.progress(p); render(state.p);
+      },
+    };
     const at = new URLSearchParams(location.search).get("at");
     if (at) {
       const [id, t] = at.split(":");
       const p = progressOf(id, parseFloat(t || "0"));
       const st = ScrollTrigger.getAll()[0];
-      requestAnimationFrame(() => window.scrollTo(0, st.start + (st.end - st.start) * p));
+      if (Number.isFinite(p)) requestAnimationFrame(() => window.scrollTo(0, st.start + (st.end - st.start) * p));
     }
   }
+  return () => {
+    disposed = true;
+    if (staticResize) { window.removeEventListener("resize", staticResize); staticResize = null; }
+    gsap.ticker.remove(animateTraffic);
+    window.removeEventListener("resize", resize);
+    canvas.removeEventListener("webglcontextlost", lost); wireCanvas.removeEventListener("webglcontextlost", lost);
+    room.dispose(); story?.dispose();
+    storyEl.classList.remove("is-live-3d");
+    canvas.style.opacity = "0"; wireCanvas.style.opacity = "0";
+    riseLayer.style.visibility = ""; isoLayer.style.opacity = "";
+    heroCopy.style.opacity = ""; heroCopy.style.visibility = ""; heroCopy.style.translate = "";
+    if (import.meta.env.DEV) delete window.__tamira;
+  };
+
 }

@@ -1,3 +1,7 @@
+> **Ending update — decision 23:** after smoke, the expanded `finale` runs the original rear three-wire switchboard connection and camera arc; new `room` pulls into the original living room and switches on five lighting groups. See [ROOM-FINALE.md](ROOM-FINALE.md). Earlier single-switch finale descriptions below are superseded.
+
+> **Update — decision 22:** `rise` is now a continuous Three.js camera move over procedural city geometry, not a rendered image sequence. The segment order and pacing remain unchanged. GSAP labels drive all stages; daylight traffic runs on its ticker. See [LIVE-3D.md](LIVE-3D.md).
+
 # The scroll story
 
 The whole homepage is one pinned stage. A single scroll progress value `p` (0 → 1) drives everything:
@@ -13,8 +17,8 @@ The story is split into **segments**. Each segment gets a length in **screens**,
 
 | # | Segment | Screens | What happens |
 |---|---|---|---|
-| 1 | `day` | 0.35 | Centred headline, one sentence and one button over a framed day city. A short beat before anything moves. |
-| 1b | `open` | 1.2 | The copy lifts away and the frame opens to the full screen: the immersive city, held still. |
+| 1 | `day` | 0.35 | Street level: the orange crown tower rises in front of the centred headline; sentence and button on the left. A short beat before anything moves. |
+| 1b | `rise` | 1.6 | The copy lifts away and the camera rises from street level to the isometric view (rendered frames, scroll-scrubbed). |
 | 2 | `wireOn` | 1.2 | The day city turns into the wireframe: the page goes white → warm night and orange lines climb the same buildings. |
 | 3 | `extend` | 1.4 | The camera pulls back; a larger wireframe city grows in around a street-lit avenue. |
 | 4 | `run` | 2.2 | The red wire runs along the avenue. Street lights and buildings light up behind its tip. |
@@ -36,16 +40,16 @@ The story is split into **segments**. Each segment gets a length in **screens**,
 ## Beat by beat
 
 ### 1. Day (`day`)
-- **What's on screen:** the header; under it, centred, the headline "Good wiring is the kind / you never think about", one sentence ("Tamira makes copper house wire for homes and buildings: safe, flexible, and built to last.") and one button ("Talk to us" → contact). Below that, the day city (`hero-city-*`, the clay Cycles render) in a frame on the page grid: equal side margins, running to the bottom of the viewport, square corners, the crown tower centred with its whole star inside the frame.
-- **How the frame works:** the city is one full-screen `object-fit: cover` layer. `main.js` (`layoutFrame` / `setFrame`) clips it to the frame with `clip-path: inset()` and scales/moves the image so the crown sits in the frame. There are no CSS masks.
-- **Traffic:** after page load a 10 s seamless loop of small clay cars driving the streets fades in over the still (`.hero__video`, `hero-traffic-2560.webm` / `.mp4`, rendered by `art/blender/animate_city.py`). Same camera and city, so it's the poster with cars moving; frame 0 is the poster. It keeps playing while the frame opens and pauses once `wireOn` hides the image. Not loaded under reduced motion or Save-Data.
-- **Page load:** the header fades in, the two headline lines rise in turn, the sentence and button follow, and the framed city fades in. Then the traffic loop starts over the still (below).
+- **What's on screen:** the header; the centred headline "Good wiring is the kind / you never think about"; full bleed behind and around it, a street-level shot of the same clay city (camera on the −Y side, 50 mm, 35 m up, 430 m out, looking slightly up), the orange crown tower centred and unobstructed (93%, measured by ray casts), white sky. The tower's top cuts into the headline's second line (the tower layer sits in front of the words, as in the client's reference); the sentence and "Talk to us" sit in the left column over the sky. On phones the copy is centred at the top and the street-level picture starts shrunk to a skyline ~2.1 screens wide along the bottom.
+- **The picture:** `hero-rise-{1920,3840}.webp` (`.hero__opening`), rise frame 0 rendered at 3840, sky transparent so the page and the headline show through. The far ground fades to transparent beyond the isometric frame (render setting only; the asset is unchanged).
+- **Page load:** the header fades in, the two headline lines rise in turn, the sentence and button follow, and the street-level picture fades in.
 
-### 1b. The frame opens (`open`)
-- **0–20%:** the headline, sentence and button rise 24px and fade out (gone before the frame's edge reaches them).
-- **14–85%:** the clip opens to the full screen while the image scales/moves back to its plain full-screen cover framing (a pure function of scroll, reversible).
-- **85–100%:** the full-screen city holds: the immersive beat. The image is now exactly the frame the wireframe hand-over is aligned to.
-- Pattern adapted from incident.io's hero (a framed panel under a centred headline that grows as you scroll), with the city in place of a product mock-up and opening all the way to full bleed.
+### 1b. The rise (`rise`)
+- **0–20%:** the headline, sentence and button rise 24px and fade out.
+- **The camera move:** 72 Cycles frames (`/media/rise/r_0000–0071.webp`, 1600 wide, alpha) from `art/blender/animate_city.py` job `rise`. Azimuth −90° → −45°, elevation −6° → 38°, target from the tower's mid-height to the isometric centre, frame width 311 → 400 m, while the camera dollies out (to 40 km) and the lens lengthens: a dolly-zoom into the orthographic view. The last frame *is* the isometric hero camera. `main.js` draws them on `.hero__seq` (same cover crop as every layer) and crossfades neighbours, so scrubbing is smooth; frames load after first paint and the nearest loaded frame (or the opening still) stands in.
+- **95–100%:** the isometric layer (`.hero__iso`: the day render + traffic loop) takes over from the last frame; at 100% the street-level layer is hidden. The traffic loop starts once the rise has landed (frame 0 of the loop = the rise's last frame) and pauses once `wireOn` hides the image.
+- **Phones:** the shrunk skyline grows back to full-screen cover over 5–60% of the rise.
+- Replaces the framed hero (incident.io pattern, DECISIONS 14) on client direction (DECISIONS 20).
 
 ### 2. Day → wireframe (`wireOn`)
 - **Page colour:** white → warm night (`#140b07`) over roughly 12–50% of the segment.
@@ -131,9 +135,9 @@ Most retuning is a number in one of these places:
 With `npm run dev` running:
 
 ```
-?at=day:0.5          day hero (framed)
-?at=open:0.5         frame opening
-?at=open:0.95        full-screen city
+?at=day:0.5          street-level hero
+?at=rise:0.5         mid-rise
+?at=rise:0.97        landing on the isometric view
 ?at=wireOn:0.4       day → wireframe, mid-transition
 ?at=wireOn:0.95      wireframe city
 ?at=extend:0.95      pulled-back city with the avenue

@@ -136,6 +136,18 @@ This is a record of client direction and design decisions, in order. All entries
 - **Feedback:** when the wire powers a building, its edges were lighting up too; only the windows should.
 - **Done:** powering a building no longer changes its lines (they used to shift orange → warm white and brighten 15%) and no longer adds the faint wall glow. Only the golden windows switch on, one by one, as before. Street lamps are unchanged. Supersedes the "lit outlines" part of entry 17.
 
+## 20. Street-level hero that rises to the isometric view
+- **Request:** drop the framed hero for a whole cityscape scene, using the same asset and changing only the camera (reference: a tower seen at eye level, centred, rising into a headline against white sky); the orange crown tower is the main building; on scroll, go back to the isometric view, then continue the story.
+- **Found:** from the iso side (−45°…−60°) the tower is 30–50% hidden behind a white tower; from −90° it's 93% visible (ray-cast scan). The asset has windows only on its camera-facing sides, which −90° also faces.
+- **Client choices (recommendations accepted):** 50 mm, camera low (35 m) over a 60 mm higher option; the tower in front of the headline (as the reference) over headline-above; distant ground faded to white over keeping a grey horizon.
+- **Done:** `animate_city.py` jobs `rise` / `riseposter` / `risewebp` (same scene as the traffic loop at its frame 0; sky transparent; ground fades beyond the isometric frame; dolly-zoom from perspective into the exact orthographic camera). The site: full-bleed hero, scroll-scrubbed frames, headline between the layers, sentence + button in the left column, phone skyline fit. The wireframe hand-off is unchanged (the isometric layer is the same image). Segment `open` → `rise` (1.6 screens).
+- **Replaces:** the framed hero (entry 14). `--content-x` keeps the old frame's margin formula for the page grid.
+
+## 21. The real logo
+- **Request:** use `asset/tamira-logo.svg` as the site logo.
+- **Done:** the SVG (single colour `#F45E5E`, no scripts) is served as `public/tamira-logo.svg` in the header link, 20px tall, on `--content-x`. The live-text Quicksand wordmark and the Quicksand font request are gone.
+- **Open:** on the dark wireframe the coral logo reads weaker than the white nav (OPEN-ITEMS).
+
 ## Rejected or replaced along the way
 - The "wave" transition (client, before this repo).
 - A matched-frame Blender camera dive into a wall as the city → wire hand-over. It was replaced by the live-3D hand-over.
@@ -145,4 +157,26 @@ This is a record of client direction and design decisions, in order. All entries
 - The street-level "train ride" camera shot.
 - The day → night video and the night city.
 - The cyan-on-navy wireframe (replaced by orange on a warm night, entry 17).
+- The framed hero that opened to full screen (replaced by the street-level rise, entry 20).
 - The soft, foggy `hero_day.py` v1 finish (strong DOF, orange glow light). It was replaced by the clay / ceramic render (entry 12).
+
+## 22. Live Three.js city and GSAP interactions
+- **Request:** create the complete 3D assets and interactions with Three.js and GSAP.
+- **Done:** `src/story/daylight.js` builds the solid city directly from the shared layout manifest: 36 surrounding buildings, the six-arm crown with a central opening, 1,721 instanced window insets, roads, ceramic trees and 54 moving cars. Beveled geometry, satin PBR materials, environment lighting and static directional shadows replace the offline daylight view during normal browsing.
+- **Camera:** continuous perspective-to-isometric rise, reproducing the existing opening camera and 16:9 cover crop, including the phone skyline fit. The same city renderer then renders the existing warm wireframe, powering windows and cable journey. There is no rise-frame or traffic-video playback.
+- **GSAP:** one labeled master timeline controls all story segments; the GSAP ticker runs traffic only while the daylight city is visible. `matchMedia` handles reduced motion, including live preference changes. Cleanup disposes GPU resources and listeners; context loss falls back to the static story.
+- **Kept:** Geist typography, actual SVG logo, current headline layering, story chapter content, procedural cable, conduit, heater, flame, smoke and switch plate. Existing renders remain as fallbacks/source references; no Blender assets were deleted.
+- **Also fixed:** portrait heat gauge moved above the heater to keep the temperature readable.
+- **Limit:** this is rasterized realtime PBR, not Cycles path tracing. Indirect bounce, penumbra and material response differ from the offline render. Real-device GPU performance and final look sign-off remain outstanding.
+
+## 23. Port the original switchboard and living-room finale
+- **Request:** inspect the supplied `dsingh-sixjuly/wirecable-showcase` repository and implement its complete room ending.
+- **Choices confirmed:** reuse the original rendered room for an exact visual match, and include the rear three-wire connection sequence before entering it.
+- **Done:** original five-switch board, wall materials, L/N/E seating and click pulses; red/black/green wires on the source rails; original camera spline and matched room handoff; original room images, pullback, five lighting steps and dark close. New `room` segment follows the expanded `finale` segment, then the current contact section.
+- **Implementation:** current Three.js/GSAP stack, no React migration, no added WebGL context. Original room imagery is rendered offline and painted on Canvas2D exactly as in the source. Full provenance, scope and validation are in `ROOM-FINALE.md`.
+
+### Single continuous wire at the switchboard (2026-11-04)
+The latest direction supersedes the three-wire finale: reuse the existing product cable and scene, morph its world-space path into the original red terminal rail, and track its tip continuously. No black/green cables, scene replacement, or canvas opacity dip. The original board camera arc and rendered room ending remain. Reconstruct the smoke endpoint on each seek so reverse scrolling and resizing are deterministic.
+
+### Restore original finale motion (2026-11-04)
+Use the original three-wire camera path, view offset and cubic red-wire insertion timing, with only one red cable. Remove the added tip-follow camera translation and delayed path sampling. A short smoke-camera bridge ends at source time 6.32; the original camera path is unchanged after that point.
