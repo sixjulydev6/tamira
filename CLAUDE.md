@@ -24,7 +24,7 @@ npm run build
 npm run preview
 ```
 
-Plain HTML/CSS/JavaScript, Vite 5.4.10, GSAP/ScrollTrigger 3.12.5, Three.js 0.170.0. Keep versions pinned. The scene is lazy-loaded after first paint. Dev review: `?at=finale:0.45`, `?at=room:0.55`; the room is the 48 rendered images on every device (DECISIONS 34); `?room=glb` opens the live GLB room on desktop for development only (`src/story/room-live.js` / `room-glb.js`, `public/room-3d/`, lab `/room-lab.html`); runtime helper `window.__tamira.seek(segment,t)` and `.diagnostics()` are development tools.
+Plain HTML/CSS/JavaScript, Vite 5.4.10, GSAP/ScrollTrigger 3.12.5, Lenis 1.3.27, Three.js 0.170.0. Keep versions pinned. The scene is lazy-loaded after first paint. Dev review: `?at=finale:0.45`, `?at=room:0.55`; the room is the 48 rendered images on every device (DECISIONS 34); `?room=glb` opens the live GLB room on desktop for development only (`src/story/room-live.js` / `room-glb.js`, `public/room-3d/`, lab `/room-lab.html`); runtime helper `window.__tamira.seek(segment,t)` and `.diagnostics()` are development tools.
 
 ## Code ownership
 

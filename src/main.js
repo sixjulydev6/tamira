@@ -1,5 +1,7 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Lenis from "lenis";
+import "lenis/dist/lenis.css";
 import { SEGMENTS, TOTAL_SCREENS, local, smooth, windowed, lerp, progressOf } from "./story/timeline.js";
 import { createRoom } from "./story/room.js";
 import { createLiveRoom } from "./story/room-live.js";
@@ -90,6 +92,15 @@ function runStory() {
   root.style.setProperty("--story-screens", String(TOTAL_SCREENS + 1));
   let disposed = false;
   const room = (ROOM_MODE === "glb" ? createLiveRoom : createRoom)(document.querySelector(".room-finale"));
+
+  /* Lenis smooth scroll, driven by GSAP's ticker so ScrollTrigger and the story render on the same
+     frame. Wheel and trackpad are smoothed; touch keeps native momentum. Reduced motion never gets
+     here (goStatic), so it keeps native scrolling. In-page anchors glide through Lenis. */
+  const lenis = new Lenis({ autoRaf: false, anchors: true, lerp: 0.1 });
+  lenis.on("scroll", ScrollTrigger.update);
+  const lenisRaf = (time) => lenis.raf(time * 1000);
+  gsap.ticker.add(lenisRaf);
+  gsap.ticker.lagSmoothing(0);
 
   /* page-load moment (once), timed as the reference: masked lines rise 110% over 0.8s with a 0.05s
      stagger, the sentence with them; the action pops in from 0.4s */
@@ -245,7 +256,7 @@ function runStory() {
   const master = gsap.timeline({
     defaults: { ease: "none" },
     onUpdate: () => render(state.p),
-    scrollTrigger: { id: "tamira-story", trigger: storyEl, start: "top top", end: "bottom bottom", scrub: 0.6 },
+    scrollTrigger: { id: "tamira-story", trigger: storyEl, start: "top top", end: "bottom bottom", scrub: 0.3 },   // Lenis already smooths the input; a short scrub only rounds off keyboard jumps
   });
   let elapsed = 0;
   for (const segment of SEGMENTS) {
@@ -276,12 +287,13 @@ function runStory() {
       const [id, t] = at.split(":");
       const p = progressOf(id, parseFloat(t || "0"));
       const st = ScrollTrigger.getAll()[0];
-      if (Number.isFinite(p)) requestAnimationFrame(() => window.scrollTo(0, st.start + (st.end - st.start) * p));
+      if (Number.isFinite(p)) requestAnimationFrame(() => lenis.scrollTo(st.start + (st.end - st.start) * p, { immediate: true }));
     }
   }
   return () => {
     disposed = true;
     gsap.ticker.remove(animateTraffic);
+    gsap.ticker.remove(lenisRaf); gsap.ticker.lagSmoothing(500, 33); lenis.destroy();
     window.removeEventListener("resize", resize);
     canvas.removeEventListener("webglcontextlost", lost); wireCanvas.removeEventListener("webglcontextlost", lost);
     room.dispose(); story?.dispose();
