@@ -308,3 +308,8 @@ The supplied bundled-cable material was applied, then rejected by the user and f
 - The user asked for Lenis smooth scrolling. `lenis` 1.3.27 is pinned. It is created in `runStory()` with `autoRaf: false`, driven by `gsap.ticker` (`lagSmoothing(0)`), and calls `ScrollTrigger.update` on every Lenis scroll. Wheel and trackpad input is smoothed (`lerp` 0.1). Touch keeps native momentum (no `syncTouch`). In-page anchors (`anchors: true`) glide. Reduced motion never runs `runStory()`, so it keeps native scrolling. The cleanup destroys Lenis and restores the ticker's lag smoothing.
 - The master timeline's `scrub` went from 0.6 to 0.3, because Lenis already smooths the input and the two together felt floaty. The dev `?at=` jump uses `lenis.scrollTo(..., { immediate: true })`.
 - Checked in muted Comet: wheel input eases (scrollY 1604 → 2054 → 2400), the 3D story follows, "Talk to us" glides to the contact section, and there are no console errors. `verify-skyline.mjs` passes at both sizes, including the reduced-motion teardown and rebuild.
+
+## 40. X-ray shows only the wired district (2026-11-05)
+
+- The user asked to remove the background buildings in the wireframe/hairline mode and keep the main ones. The outer-city filler (`filler.js`) no longer draws box outlines. Its solid blocks were already dissolved by the x-ray shader, so the scan now shows only the hero tower and the 36 modelled district buildings that the underground network feeds. In daylight the filler is unchanged. `lidar.js` `boxEdges` is now unused and kept for reference.
+- Checked in muted Comet at 1440×900: wireOn 0.5/1, extend 1, run 0.3. `verify-skyline.mjs` passes.

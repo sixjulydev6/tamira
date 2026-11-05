@@ -1,13 +1,12 @@
 import * as THREE from 'three'
-import { patchCityMaterial, makeEdgeMaterial } from './cityMaterial.js'
-import { boxEdges } from './lidar.js'
+import { patchCityMaterial } from './cityMaterial.js'
 import { rng } from './layout.js'
 
 // A hazy outer city beyond the modelled district so the skyline sits inside a metropolis
 // rather than on an empty plane. Facades are storey bands drawn in the shader (no atlas
 // patches); nothing is placed in the opening sightline, and nothing is taller than the tower.
 export function createFiller(envMap, count = 300) {
-  const { mesh, outline } = buildOnce(() => {
+  const mesh = buildOnce(() => {
     const r = rng(7)
     const geo = new THREE.BoxGeometry(1, 1, 1)
     geo.translate(0, 0.5, 0)
@@ -48,13 +47,11 @@ export function createFiller(envMap, count = 300) {
     }
     mesh.count = i
     mesh.receiveShadow = true
-    // in the x-ray state the outer city is just its outlines, fading with distance
-    const outline = new THREE.LineSegments(boxEdges(mesh), makeEdgeMaterial(1300))
-    outline.renderOrder = 3
-    outline.frustumCulled = false
-    return { mesh, outline }
+    // the x-ray state shows only the wired district: the outer city dissolves with no outlines
+    // (user direction 2026-11-05; the solid blocks are already discarded by the x-ray shader)
+    return mesh
   }, [count, envMap])
 
-  const group=new THREE.Group();group.add(mesh,outline);return group;
+  const group=new THREE.Group();group.add(mesh);return group;
 }
 function buildOnce(fn){return fn();}
