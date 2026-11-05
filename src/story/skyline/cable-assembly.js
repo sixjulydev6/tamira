@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Wire } from '../wire.js';
 import { smooth, lerp } from '../timeline.js';
 import { ENTER } from './building.js';
+import { SINGLE } from './layout.js';
 
 export const ASSEMBLY_SCALE = .0875;
 export const CORE_SCALE = ASSEMBLY_SCALE * .36;
@@ -11,6 +12,40 @@ const PIVOT = 2.6;
 function sleeve(radius, from, to, open = true) {
   const geo = new THREE.CylinderGeometry(radius, radius, to - from, 72, 1, open);
   geo.rotateX(Math.PI / 2);geo.translate(0, 0, (from + to) / 2);
+  return geo;
+}
+
+// The ceiling run beyond the cut, to the light it feeds (building.js: feedX, z 39.2 → x 84.5),
+// in assembly units. Same radius and print as the sheath, so before the reveal the assembly
+// is the ceiling cable; at the reveal this piece parts from the cut and fades.
+function farRun() {
+  const L1 = (39.2 - ENTER[2]) / ASSEMBLY_SCALE, L2 = (SINGLE.feedX - 84.5) / ASSEMBLY_SCALE, R = .3 / ASSEMBLY_SCALE;
+  const path = new THREE.CurvePath();
+  path.add(new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, L1 - R)));
+  path.add(new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, L1 - R), new THREE.Vector3(0, 0, L1), new THREE.Vector3(-R, 0, L1)));
+  path.add(new THREE.LineCurve3(new THREE.Vector3(-R, 0, L1), new THREE.Vector3(-L2, 0, L1)));
+  const STEPS = 160, RAD = 72, up = new THREE.Vector3(0, 1, 0), total = path.getLength();
+  const pos = [], nor = [], uv = [], idx = [];
+  const c = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let i = 0; i <= STEPS; i++) {
+    const u = i / STEPS;path.getPointAt(u, c);path.getTangentAt(u, t);
+    side.crossVectors(up, t).normalize();
+    for (let j = 0; j <= RAD; j++) {
+      // same angular parametrisation as the sheath cylinder: x = sin θ, y = −cos θ
+      const th = j / RAD * Math.PI * 2;
+      n.copy(side).multiplyScalar(Math.sin(th)).addScaledVector(up, -Math.cos(th));
+      pos.push(c.x + n.x, c.y + n.y, c.z + n.z);nor.push(n.x, n.y, n.z);uv.push((40 + u * total) / 13, 1.375 - j / RAD);
+    }
+  }
+  for (let i = 0; i < STEPS; i++) for (let j = 0; j < RAD; j++) {
+    const a = i * (RAD + 1) + j, b = a + RAD + 1;
+    idx.push(a, a + 1, b, b, a + 1, b + 1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
   return geo;
 }
 
@@ -35,8 +70,10 @@ export function createCableAssembly(redWire) {
   const cutWhite = new THREE.MeshStandardMaterial({color:'#ded9d0',roughness:.6,side:THREE.DoubleSide});
   const bed = new THREE.MeshPhysicalMaterial({color:'#f4efe6',roughness:.65,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide});
   const outerGeo=sleeve(1,-40,0),uv=outerGeo.attributes.uv;
-  for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getY(i)*40/13,uv.getX(i));
+  for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getY(i)*40/13,1.375-uv.getX(i));
   sheath.add(new THREE.Mesh(outerGeo,white),new THREE.Mesh(sleeve(.86,-40,0),inside),new THREE.Mesh(new THREE.RingGeometry(.86,1,72),cutWhite));
+  const farWhite = white.clone();farWhite.side = THREE.FrontSide;
+  const far = new THREE.Mesh(farRun(),farWhite);group.add(far);
   bedding.add(new THREE.Mesh(sleeve(.84,-40,0),bed),new THREE.Mesh(new THREE.RingGeometry(.81,.84,72),cutWhite));
   const cores=[
     {id:'red',wire:redWire,angle:Math.PI/6},
@@ -52,8 +89,10 @@ export function createCableAssembly(redWire) {
   const point=new THREE.Vector3(),redScale=new THREE.Vector3();
   let lastExplosion=-1,lastPoints=null;
 
-  function update(explosion,points,extraction=0) {
+  function update(explosion,points,extraction=0,part=1) {
     group.visible=true;
+    // the far run parts from the cut and fades, opening the reveal
+    far.position.z=9*part*part*(3-2*part);
     const fan=.085*smooth(.3,.85,explosion);
     sheath.position.z=-3.6*smooth(0,.55,explosion);
     bedding.position.z=-2.2*smooth(.15,.7,explosion);
@@ -89,6 +128,8 @@ export function createCableAssembly(redWire) {
     }
     const opacity=1-smooth(.5,.75,extraction);
     group.traverse(o=>{if(o.material){if(o.material.userData.assemblyOpacity===undefined)o.material.userData.assemblyOpacity=o.material.opacity;o.material.transparent=true;o.material.opacity=o.material.userData.assemblyOpacity*opacity;}});
+    const farFade=1-smooth(.15,1,part);
+    farWhite.opacity=opacity*farFade;far.visible=farFade>.001;
     group.visible=opacity>.001;
     lastExplosion=explosion;lastPoints=points;
     return {tip:redTip.clone(),rotation:redRotation.clone(),straight};

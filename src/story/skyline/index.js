@@ -203,6 +203,9 @@ export function createSkyline(renderer) {
     S.xray=smooth(0,1,scan);S.network=smooth(0,1,net);S.climb=climb;S.room=smooth(.66,1,climb);
     S.isolate=.85*smooth(0,.35,climb)+.15*smooth(0,.2,follow);S.follow=follow;
     S.enter=smooth(0,.22,bundle);S.explode=smooth(.15,.86,bundle);
+    // the assembly crossfades in over the ceiling cable at the end of the follow (same geometry),
+    // then its far run parts from the cut as the reveal begins: no frame where one cable swaps for another
+    S.bridge=bundle>0?1:smooth(.82,1,follow);S.part=smooth(.02,.2,bundle);
     // Settle the source camera's damping immediately. Story placement follows
     // progress even on direct/reverse seeks; ambient time stays separate.
     rig.update(elapsed,10);
@@ -231,8 +234,8 @@ export function createSkyline(renderer) {
     sample('sun',night,sun.color);sun.intensity=sample('sunI',night)*(1-S.xray*.8);
     sample('hemiSky',night,hemi.color);sample('hemiGround',night,hemi.groundColor);hemi.intensity=sample('hemiI',night)*(1-S.xray*.55);
     sample('fog',night,fog.color);fog.color.lerp(new THREE.Color('#03050b'),S.xray*.9);fog.density=sample('fogD',night);
-    if(bundle>0&&productEntry){
-      const pose=assembly.update(S.explode,productEntry.points,drain);
+    if(S.bridge>0&&productEntry){
+      const pose=assembly.update(S.explode,productEntry.points,drain,S.part);
       if(drain>0)updateBridge(drain,productEntry,pose);
       else bridgeCamera.copy(camera);
     } else assembly.hide();
@@ -272,20 +275,41 @@ export function createSkyline(renderer) {
     const drain=local(lastP,'drain'),bundle=local(lastP,'bundle');
     renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
     renderer.setClearColor('#05070b',1);composer.render();
-    if(bundle>0&&entry){
+    if(S.bridge>0&&entry){
       // Fade only the room/city background, retaining a live red wire on top.
       const a=smooth(.5,.9,drain);
       renderer.autoClear=false;
       if(a>0){fadeMaterial.uniforms.uColor.value.set(lastBg);fadeMaterial.uniforms.uAlpha.value=a;renderer.render(fadeScene,fadeCamera);}
-      if(S.enter>.12){renderer.clearDepth();renderer.toneMapping=THREE.NeutralToneMapping;renderer.render(bridgeScene,bridgeCamera);}renderer.autoClear=true;
+      renderer.toneMapping=THREE.NeutralToneMapping;
+      if(S.bridge<1){
+        // Crossfade: draw the assembly offscreen, then composite it as one layer so its
+        // inner layers never show through the half-faded sheath.
+        renderer.getDrawingBufferSize(bufferSize);
+        if(bridgeTarget.width!==bufferSize.x||bridgeTarget.height!==bufferSize.y)bridgeTarget.setSize(bufferSize.x,bufferSize.y);
+        renderer.setRenderTarget(bridgeTarget);renderer.setClearColor(0,0);renderer.clear();
+        renderer.render(bridgeScene,bridgeCamera);renderer.setRenderTarget(null);
+        compositeMaterial.uniforms.uAlpha.value=S.bridge;renderer.render(compositeScene,fadeCamera);
+      } else {renderer.clearDepth();renderer.render(bridgeScene,bridgeCamera);}
+      renderer.autoClear=true;
     }
   }
   const fadeMaterial=new THREE.ShaderMaterial({uniforms:{uColor:{value:new THREE.Color()},uAlpha:{value:0}},vertexShader:'void main(){gl_Position=vec4(position.xy,0.,1.);}',fragmentShader:'uniform vec3 uColor;uniform float uAlpha;void main(){gl_FragColor=vec4(uColor,uAlpha);#include <colorspace_fragment>\n}',transparent:true,depthTest:false,depthWrite:false});
   // Shader directives must start on their own line.
   fadeMaterial.fragmentShader=fadeMaterial.fragmentShader.replace(';#include',';\n#include');
   const fadeScene=new THREE.Scene(),fadeCamera=new THREE.Camera();fadeScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),fadeMaterial));
+  // Offscreen bridge layer for the ceiling-cable crossfade. It holds linear, premultiplied
+  // colour; the composite un-premultiplies, tone maps (Neutral, as the direct bridge pass)
+  // and blends it premultiplied, so at full alpha it equals drawing the bridge directly.
+  const bufferSize=new THREE.Vector2();
+  const bridgeTarget=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:4});
+  const compositeMaterial=new THREE.ShaderMaterial({uniforms:{tMap:{value:bridgeTarget.texture},uAlpha:{value:0}},
+    vertexShader:'varying vec2 vUv;void main(){vUv=position.xy*.5+.5;gl_Position=vec4(position.xy,0.,1.);}',
+    fragmentShader:['uniform sampler2D tMap;uniform float uAlpha;varying vec2 vUv;','void main(){','vec4 c=texture2D(tMap,vUv);float a=clamp(c.a,0.,1.);','gl_FragColor=vec4(a>0.?c.rgb/a:vec3(0.),1.);','#include <tonemapping_fragment>','#include <colorspace_fragment>','gl_FragColor=vec4(gl_FragColor.rgb*a*uAlpha,a*uAlpha);','}'].join('\n'),
+    depthTest:false,depthWrite:false,transparent:true,blending:THREE.CustomBlending,
+    blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,blendSrcAlpha:THREE.OneFactor,blendDstAlpha:THREE.OneMinusSrcAlphaFactor});
+  const compositeScene=new THREE.Scene();compositeScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),compositeMaterial));
   function dispose(){disposed=true;room.dispose();const geometries=new Set(),materials=new Set();
-    for(const root of [scene,bridgeScene,fadeScene])root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)ownedTextures.add(v);}if(o.isInstancedMesh)o.dispose();});
+    bridgeTarget.dispose();for(const root of [scene,bridgeScene,fadeScene,compositeScene])root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)ownedTextures.add(v);}if(o.isInstancedMesh)o.dispose();});
     geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());ownedTextures.forEach(t=>t.dispose());sun.shadow.dispose();environment.dispose();cityEnvTarget.dispose();dayEnvTarget?.dispose();composer.passes.forEach(p=>p.dispose?.());composer.dispose();for(const t of [composer.renderTarget1,composer.renderTarget2])t.depthTexture?.dispose();
   }
   return {ready,resize,update,render,dispose,get progress(){return loaded?1:progress;},bundleAnchors(){return assembly.anchors(bridgeCamera,size.width,size.height);},get loaded(){return loaded;},get error(){return error;},tick(dt){elapsed+=Math.min(dt,.05);update(lastP,lastBg,entry);render();},diagnostics(){return {loaded,error:error?.message,state:{...S},camera:camera.position.toArray(),roomVisible:room.group.visible,roomSource:room.source,entryVisible:entryMeshes.some(o=>o.visible),cityMaterials:cityMaterials.length,kitTrees:kitTrees.map(o=>o.count),dayEnvironment:!!dayEnvTarget,assembly:assembly.diagnostics(),redPosition:bridgeWire.group.position.toArray()};}};

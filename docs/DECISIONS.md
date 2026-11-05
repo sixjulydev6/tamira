@@ -347,3 +347,8 @@ The supplied bundled-cable material was applied, then rejected by the user and f
   - "Talk to us": 0.65 s from 0.55 s.
   - Poster: 1.1 s.
   - The whole reveal now finishes in about 1.2 s.
+
+## 43. Seamless ceiling-cable to three-core handover (2026-11-06)
+
+- The user reported a direct, abrupt cut between the ceiling-cable close-up (end of `approach`) and the white three-core cable (start of `bundle`), and asked for no visible cut.
+- The assembly now crossfades in over the ceiling cable during `approach` 0.82–1 as one composited layer. It carries the cable's run to the ceiling light, which parts from the cut and fades over `bundle` 0.02–0.2. The ceiling cable hides only where it is covered. The sheath print was mirrored and now reads correctly. Details: [SKYLINE-HERO.md](SKYLINE-HERO.md).

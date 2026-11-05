@@ -13,7 +13,9 @@ export const WIRE_U = {
   uSelS: { value: 0 },
   uIsolate: { value: 0 },
   uEnter: { value: 0 },
-  uEnterMin: { value: new THREE.Vector3(ENTER[0] - 0.5, ENTER[1] - 0.5, ENTER[2] - 3.3) },
+  uBridge: { value: 0 },
+  // the stretch of the followed wire that the bridge assembly redraws (its sheath + far run to the light)
+  uEnterMin: { value: new THREE.Vector3(ENTER[0] - 2.6, ENTER[1] - 0.5, ENTER[2] - 3.3) },
   uEnterMax: { value: new THREE.Vector3(ENTER[0] + 0.5, ENTER[1] + 0.5, 60) },
   uHead: { value: new THREE.Vector3() },
   uHeadOn: { value: 0 },
@@ -33,7 +35,7 @@ void main(){
 `
 const COMMON = /* glsl */ `
 uniform float uTime; uniform float uNetS; uniform float uSelS; uniform float uIsolate;
-uniform float uEnter; uniform vec3 uEnterMin; uniform vec3 uEnterMax; uniform vec3 uHead; uniform float uHeadOn;
+uniform float uEnter; uniform float uBridge; uniform vec3 uEnterMin; uniform vec3 uEnterMax; uniform vec3 uHead; uniform float uHeadOn;
 uniform float uDimAll; uniform float uXrayA; uniform float uSelBoost;
 varying vec3 vW; varying vec3 vN; varying float vS; varying float vK;
 float wHash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -46,7 +48,10 @@ float pulse(){
   float vel = isNet() > .5 ? 30. : 4.2;
   return pow(fract((vS - uTime * vel) / sp), 16.);
 }
-bool entered(){ return uEnter > .12 && isSel() > .5; }
+// Once the assembly has fully crossfaded in over it, the covered stretch hands over to it;
+// the rest of the run (off-screen) goes once the reveal starts.
+bool covered(){ return all(greaterThan(vW, uEnterMin)) && all(lessThan(vW, uEnterMax)); }
+bool entered(){ return isSel() > .5 && (uEnter > .12 || (uBridge > .999 && covered())); }
 `
 const TUBE_FRAG = /* glsl */ `
 ${COMMON}
@@ -174,6 +179,7 @@ export function createWiring(gl) {
       : THREE.MathUtils.lerp(M.room, M.end + 2, smooth(c, 0.8, 1))
     WIRE_U.uIsolate.value = S.isolate
     WIRE_U.uEnter.value = S.enter
+    WIRE_U.uBridge.value = S.bridge
     WIRE_U.uXrayA.value = 0.32 * (1 - S.enter)
     // the product takes over: the rest of the run and its neighbours fall away
     WIRE_U.uDimAll.value = smooth(S.explode, 0.02, 0.45) * 0.94
