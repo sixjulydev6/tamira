@@ -68,6 +68,16 @@ TEXTURED.update({
     "glass_warm": dict(_FACADE, z0=7.2, tile_v=18.0, v0=0.30005, vspan=0.6726, repeat=True, u_off=0.71),
     "glass_store": dict(_FACADE, z0=0.0, tile_v=7.2, v0=0.0, vspan=0.300, repeat=False, u_off=0.0),
 })
+# Park trees: the BlenderKit "A tree" (asset/tree/) reduced by prepare_tree.py to a ~900-tri kit
+# (art/blender/skyline/tree/tree_kit.blend: object tree_ash, materials leaf_ash / bark_ash). When set, every
+# tree (park, outer park, lawns, streets, roof gardens) uses it; only the low shrubs / planter bushes keep the
+# procedural kit. Applied when the instances are made, so placement and randomness are unchanged.
+# Look-dev textures: TEX_DIR/tree_ash/{leaf_COL.png,bark_COL.jpg,bark_NRM.jpg}.
+TREE_KIT = None
+KIT_TREE = {"round": "ash", "round_lo": "ash", "column": "ash"}
+TREE_LIMIT = 3000   # total kit trees: street / lawn / roof trees all stay; park + outer-park groves are thinned
+
+
 # per-building wall material overrides (BUILDINGS index -> material)
 WALL_OVERRIDE = {22: "brick_reclaimed"}  # front punched block, x 10..45, z 85..132.5
 
@@ -933,6 +943,12 @@ def species_meshes(mats):
         "shrub": (lambda b: canopy(b, [(0, 0, .7, 1.1, .6), (.7, .3, .6, .8, .6)], 0), "leaf_olive"),
         "planter_shrub": (lambda b: canopy(b, [(0, 0, .45, .7, .65), (.45, .2, .4, .5, .7), (-.4, -.25, .42, .55, .7)], 0), "leaf_deep"),
     }
+    if TREE_KIT:
+        with bpy.data.libraries.load(TREE_KIT, link=False) as (src, dst):
+            dst.meshes = ["tree_ash"]
+        out["ash"] = dst.meshes[0]
+        if TEX_DIR:
+            tree_textures(out["ash"])
     for name, (fn, leaf) in defs.items():
         b = bmesh.new()
         fn(b)
@@ -945,6 +961,33 @@ def species_meshes(mats):
             p.use_smooth = True
         out[name] = me
     return out
+
+
+def tree_textures(me):
+    """look-dev images on the kit's leaf_ash (cutout atlas) / bark_ash (colour + normal)"""
+    import os
+    d = os.path.join(TEX_DIR, "tree_ash")
+    for m in me.materials:
+        nt = m.node_tree
+        b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+        def img(f, cs):
+            t = nt.nodes.new("ShaderNodeTexImage")
+            t.image = bpy.data.images.load(os.path.join(d, f), check_existing=True)
+            t.image.colorspace_settings.name = cs
+            return t
+        if m.name.startswith("leaf_"):
+            t = img("leaf_COL.png", "sRGB")
+            cut = nt.nodes.new("ShaderNodeMath")
+            cut.operation = "GREATER_THAN"
+            cut.inputs[1].default_value = 0.5
+            nt.links.new(t.outputs["Color"], b.inputs["Base Color"])
+            nt.links.new(t.outputs["Alpha"], cut.inputs[0])
+            nt.links.new(cut.outputs[0], b.inputs["Alpha"])
+        else:
+            nt.links.new(img("bark_COL.jpg", "sRGB").outputs["Color"], b.inputs["Base Color"])
+            nm = nt.nodes.new("ShaderNodeNormalMap")
+            nt.links.new(img("bark_NRM.jpg", "Non-Color").outputs["Color"], nm.inputs["Color"])
+            nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
 
 
 def car_meshes(mats):
@@ -1091,6 +1134,17 @@ def build(render=False):
     # instanced planting / cars: linked duplicates under one parent per mesh
     sp = species_meshes(mats)
     roots = {}
+    if TREE_KIT:
+        trees[:] = [(KIT_TREE.get(t[0], t[0]),) + tuple(t[1:]) for t in trees]
+        # park + outer-park trees (ground level, in the park or west of the modelled ground)
+        grove_i = [i for i, t in enumerate(trees) if t[0] == "ash" and t[2] < .5 and (t[3] >= PARK_Z0 or t[1] < GX0)]
+        n_ash = sum(1 for t in trees if t[0] == "ash")
+        drop = n_ash - TREE_LIMIT
+        if drop > 0:
+            rk = random.Random(77)
+            keys = {i: rk.random() for i in grove_i}   # own seed: no other random sequence changes
+            gone = set(sorted(grove_i, key=keys.get)[:drop])
+            trees[:] = [t for i, t in enumerate(trees) if i not in gone]
     for kind, x, y, z, s, rot in trees:
         if kind not in roots:
             e = bpy.data.objects.new(f"TREES_{kind}", None)
@@ -1215,8 +1269,9 @@ WEB_COLLECTIONS = ("hero", "entry", "city", "ground", "planting", "cars")
 
 
 def export_web(path, scene_name=SCENE_NAME):
-    """GLB for src/story/skyline: no UVs/textures (constant PBR factors per material class),
-    flat normals, Y-up, linked planting/cars as EXT_mesh_gpu_instancing."""
+    """GLB for src/story/skyline: no images (constant PBR factors per material class; the TEXTURED
+    materials carry their box UVs and index.js adds the textures), flat normals, Y-up, linked
+    planting/cars as EXT_mesh_gpu_instancing."""
     scene = bpy.data.scenes[scene_name]
     if bpy.context.window:
         bpy.context.window.scene = scene
@@ -1225,7 +1280,7 @@ def export_web(path, scene_name=SCENE_NAME):
         lc.exclude = lc.name.replace("SKY_", "") not in WEB_COLLECTIONS
     bpy.ops.export_scene.gltf(
         filepath=path, export_format="GLB", use_visible=True, export_yup=True, export_apply=True,
-        export_normals=True, export_texcoords=False, export_tangents=False, export_materials="EXPORT",
+        export_normals=True, export_texcoords=True, export_tangents=False, export_materials="EXPORT",
         export_vertex_color="NONE", export_cameras=False, export_lights=False, export_extras=False,
         export_gpu_instances=True, export_draco_mesh_compression_enable=False, export_animations=False,
         use_active_scene=True)

@@ -41,7 +41,7 @@ Plain HTML/CSS/JavaScript, Vite 5.4.10, GSAP/ScrollTrigger 3.12.5, Lenis 1.3.27,
 | `src/story/finale-timing.js`, `room.js`, `room.json` | Shared ending clock, room loading/lifecycle, source framing metadata |
 | `public/room/` | All 48 unchanged source room images |
 | `art/data/city-layout.json` | Shared city layout, Z-up metres |
-| `src/style.css` | Geist Serif headings, Instrument Sans copy, actual Tamira SVG logo, responsive layout |
+| `src/style.css` | Georgia headings, Instrument Sans copy, actual Tamira SVG logo, responsive layout |
 
 Story total: 26.85 scrolling screens plus the sticky stage viewport; `finale` 4 screens and `room` 3. Story movement is deterministic from progress; daylight traffic is ambient ticker motion. GSAP matchMedia owns reduced-motion teardown/rebuild.
 

@@ -40,6 +40,17 @@ DOWNLIGHTS = [(79.5, 34.6), (79.5, 39.5), (79.5, 44.4), (82.8, 43.6), (88.6, 42.
 # room_furniture_kit.blend: one object per (piece, room material), origin at the footprint centre on the
 # floor, front facing three.js +Z. None keeps the procedural living-room furniture.
 FURN_KIT = None
+# Floor: Poliigon Wood Floor Ash 4186 (asset/floor/, Poliigon licence). One texture repeat = FLOOR_TILE
+# metres; planks run along three.js z like the old procedural planks. FLOOR_TEX is a folder holding
+# ash_BaseColor/Roughness/Normal.jpg; None keeps a flat colour (the web export leaves textures out:
+# room.js loads public/skyline/tex/wood-floor-ash/ itself).
+FLOOR_TILE = 2.0
+FLOOR_TEX = None
+# Curtains: Poliigon Fabric Plain Natural Sheer 009 (asset/furniture/, Poliigon licence). One repeat =
+# CURTAIN_TILE metres of cloth. CURTAIN_TEX is a folder holding sheer_COL/GLOSS/NRM/MASK.jpg; None keeps
+# the flat translucent colour (room.js loads public/skyline/tex/fabric-sheer/ itself).
+CURTAIN_TILE = 0.4
+CURTAIN_TEX = None
 # piece, x, z, yaw (three.js, about +Y): sofa back to the +z glass; table 0.45 m in front; chairs face it
 KIT_LAYOUT = [
     ("sofa", 85.6, 45.84, math.pi),
@@ -71,6 +82,7 @@ MATS = {
     "wood_oakwarm":    (lin("#a77b55"), 0.0, 0.58, {}),
     "wood_oakpale":    (lin("#bf9871"), 0.0, 0.52, {}),
     "wood_gap":        (lin("#3a2b20"), 0.0, 0.90, {}),
+    "wood_floorash":   (lin("#d2b59a"), 0.0, 0.50, {}),
     "wood_walnut":     (lin("#5b3f2c"), 0.0, 0.45, {}),
     "wood_door":       (lin("#d9d2c6"), 0.0, 0.50, {}),
     "frame_dark":      (lin("#2b2d31"), 0.0, 0.45, {}),
@@ -207,13 +219,19 @@ class Batch:
         b = self.bm(group, mat)
         b.faces.new([b.verts.new(T(*p)) for p in pts])
 
-    def grid(self, group, mat, rows):
-        """quad strip surface from rows of three.js points (all rows the same length)"""
+    def grid(self, group, mat, rows, uvs=None):
+        """quad strip surface from rows of three.js points (all rows the same length);
+        uvs: matching rows of (u, v) to give the batch a UVMap"""
         b = self.bm(group, mat)
         vs = [[b.verts.new(T(*p)) for p in row] for row in rows]
+        uvl = (b.loops.layers.uv.get("UVMap") or b.loops.layers.uv.new("UVMap")) if uvs else None
         for i in range(len(vs) - 1):
             for j in range(len(vs[i]) - 1):
-                b.faces.new((vs[i][j], vs[i][j + 1], vs[i + 1][j + 1], vs[i + 1][j]))
+                idx = ((i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j))
+                f = b.faces.new([vs[a][c] for a, c in idx])
+                if uvl:
+                    for lp, (a, c) in zip(f.loops, idx):
+                        lp[uvl].uv = uvs[a][c]
 
     def finish(self, mats, collections):
         objs = []
@@ -242,6 +260,44 @@ class Batch:
         return objs
 
 
+# ----------------------------------------------------------------------------- floor
+def build_floor(collection, mats):
+    """Finished floor at YB: one quad with UVs in texture repeats (u along z, the plank length)."""
+    m = mats["wood_floorash"]
+    if FLOOR_TEX:
+        import os
+        nt = m.node_tree
+        bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+        def tex(name, srgb):
+            im = bpy.data.images.load(os.path.join(FLOOR_TEX, name), check_existing=True)
+            im.colorspace_settings.name = "sRGB" if srgb else "Non-Color"
+            t = nt.nodes.new("ShaderNodeTexImage")
+            t.image = im
+            return t
+        nt.links.new(tex("ash_BaseColor.jpg", True).outputs["Color"], bsdf.inputs["Base Color"])
+        nt.links.new(tex("ash_Roughness.jpg", False).outputs["Color"], bsdf.inputs["Roughness"])
+        nmap = nt.nodes.new("ShaderNodeNormalMap")
+        nt.links.new(tex("ash_Normal.jpg", False).outputs["Color"], nmap.inputs["Color"])
+        nt.links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+    b = bmesh.new()
+    pts = [(X0, YB, Z0), (X0, YB, Z1), (X1, YB, Z1), (X1, YB, Z0)]
+    f = b.faces.new([b.verts.new(T(*p)) for p in pts])
+    f.normal_update()
+    if f.normal.z < 0:
+        f.normal_flip()
+    uv = b.loops.layers.uv.new("UVMap")
+    for lp in f.loops:
+        x, y, z = lp.vert.co.x, lp.vert.co.z, -lp.vert.co.y   # back to three.js
+        lp[uv].uv = ((z - Z0) / FLOOR_TILE, (x - X0) / FLOOR_TILE)
+    me = bpy.data.meshes.new("shell_wood_floorash")
+    b.to_mesh(me)
+    b.free()
+    me.materials.append(m)
+    ob = bpy.data.objects.new("shell__wood_floorash", me)
+    collection.objects.link(ob)
+    return ob
+
+
 # ----------------------------------------------------------------------------- shell
 def build_shell(B):
     # structural slab under the room and the next slab over it. Both stop 1 cm short of the
@@ -254,22 +310,8 @@ def build_shell(B):
     B.box("shell", "frame_dark", X1 - 0.12, X1, YC + 0.005, YC + 0.02, Z0, Z1)
     B.box("shell", "frame_dark", X0, X1 - 0.12, YC + 0.005, YC + 0.02, Z1 - 0.12, Z1)
 
-    # oak plank floor along z, staggered joints, 4 mm seams over a dark bed
+    # dark bed under the floor; the textured ash floor itself is build_floor() (it needs UVs)
     B.box("shell", "wood_gap", X0, X1, YB - 0.03, YB - 0.012, Z0, Z1)
-    r = random.Random(19)
-    pw, gap = 0.19, 0.004
-    tones = ["wood_oak", "wood_oakwarm", "wood_oakpale"]
-    x = X0
-    while x < X1 - 1e-3:
-        xe = min(x + pw, X1)
-        z = Z0 - r.uniform(0, 1.8)
-        while z < Z1:
-            ln = r.uniform(1.2, 2.4)
-            za, zb = max(z, Z0), min(z + ln - gap, Z1)
-            if zb - za > 0.05:
-                B.box("shell", tones[r.randrange(3)], x, xe - gap, YB - 0.015, YB, za, zb)
-            z += ln
-        x = xe
 
     # partitions (inner walls) with skirting; door opening in the z0 wall
     B.box("shell", "plaster_wall", X0 - 0.2, X0, YB, YC, Z0 - 0.2, Z1)
@@ -626,6 +668,48 @@ def build_plants(B):
         leaf(B, r.choice(["leaf_deep", "leaf_fresh"]), base, a, r.uniform(0.6, 1.35), r.uniform(0.35, 0.6), r.uniform(0.05, 0.08), droop=0.35)
 
 
+def texture_curtains(m):
+    """sheer weave on fabric_curtain: colour into both lobes, gloss -> roughness, normal, mask -> alpha"""
+    import os
+    nt = m.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    tr = next((n for n in nt.nodes if n.type == "BSDF_TRANSLUCENT"), None)
+    uvn = nt.nodes.new("ShaderNodeTexCoord")
+    def tex(name, srgb):
+        im = bpy.data.images.load(os.path.join(CURTAIN_TEX, name), check_existing=True)
+        im.colorspace_settings.name = "sRGB" if srgb else "Non-Color"
+        t = nt.nodes.new("ShaderNodeTexImage")
+        t.image = im
+        nt.links.new(uvn.outputs["UV"], t.inputs["Vector"])
+        return t
+    col = tex("sheer_COL.jpg", True)
+    nt.links.new(col.outputs["Color"], bsdf.inputs["Base Color"])
+    if tr:
+        nt.links.new(col.outputs["Color"], tr.inputs["Color"])
+    inv = nt.nodes.new("ShaderNodeInvert")
+    nt.links.new(tex("sheer_GLOSS.jpg", False).outputs["Color"], inv.inputs["Color"])
+    nt.links.new(inv.outputs["Color"], bsdf.inputs["Roughness"])
+    nmap = nt.nodes.new("ShaderNodeNormalMap")
+    nt.links.new(tex("sheer_NRM.jpg", False).outputs["Color"], nmap.inputs["Color"])
+    nt.links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+    # open weave: the mask holes let the city through; keep a floor so the cloth still reads
+    mx = nt.nodes.new("ShaderNodeMapRange")
+    mx.inputs["To Min"].default_value = 0.35
+    nt.links.new(tex("sheer_MASK.jpg", False).outputs["Color"], mx.inputs["Value"])
+    if tr:
+        # alpha has to sit after the translucent mix: blend through a transparent BSDF
+        out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+        surf = out.inputs["Surface"].links[0].from_node
+        tp = nt.nodes.new("ShaderNodeBsdfTransparent")
+        cut = nt.nodes.new("ShaderNodeMixShader")
+        nt.links.new(mx.outputs["Result"], cut.inputs["Fac"])
+        nt.links.new(tp.outputs[0], cut.inputs[1])
+        nt.links.new(surf.outputs[0], cut.inputs[2])
+        nt.links.new(cut.outputs[0], out.inputs["Surface"])
+    else:
+        nt.links.new(mx.outputs["Result"], bsdf.inputs["Alpha"])
+
+
 def build_curtains(B):
     """sheer curtains gathered at the bays the camera does not fly through (building.js positions)"""
     r = random.Random(11)
@@ -634,10 +718,10 @@ def build_curtains(B):
     for axis, a, b in panels:
         w, nu, nv = 0.55, 28, 10
         ph = r.uniform(0, 6.28)
-        rows = []
+        rows, uvs = [], []
         for j in range(nv + 1):
             yy = YB + 0.12 + h * j / nv
-            row = []
+            row, uvrow = [], []
             for i in range(nu + 1):
                 u = i / nu
                 along = (u - 0.5) * w
@@ -646,8 +730,15 @@ def build_curtains(B):
                     row.append((a + fold, yy, b + along))
                 else:
                     row.append((b + along, yy, a + fold))
+            # u runs along the folded cloth (arc length, ~2x the panel width), v down the drop
+            run = 0.0
+            for i, p in enumerate(row):
+                if i:
+                    run += math.dist(p, row[i - 1])
+                uvrow.append((run / CURTAIN_TILE, (yy - YB) / CURTAIN_TILE))
             rows.append(row)
-        B.grid("curtain", "fabric_curtain", rows)
+            uvs.append(uvrow)
+        B.grid("curtain", "fabric_curtain", rows, uvs)
 
 
 def build_lights(B):
@@ -780,6 +871,9 @@ def build():
     build_curtains(B)
     build_lights(B)
     objs = B.finish(mats, colls)
+    objs.append(build_floor(colls["shell"], mats))
+    if CURTAIN_TEX:
+        texture_curtains(mats["fabric_curtain"])
     if FURN_KIT:
         objs += place_kit(colls, mats)
     add_render_lights(colls["rig"])
@@ -805,8 +899,8 @@ WEB_COLLECTIONS = ("shell", "facade", "furniture", "decor", "plants", "curtain",
 
 
 def export_web(path, scene_name=SCENE_NAME):
-    """GLB in the web world frame: no UVs/textures (constant PBR factors per material class),
-    bevel modifiers applied, Y-up."""
+    """GLB in the web world frame: no textures (constant PBR factors per material class; the floor
+    carries UVs for the ash textures room.js adds), bevel modifiers applied, Y-up."""
     scene = bpy.data.scenes[scene_name]
     if bpy.context.window:
         bpy.context.window.scene = scene
@@ -815,7 +909,7 @@ def export_web(path, scene_name=SCENE_NAME):
         lc.exclude = lc.name.replace("ROOM_", "") not in WEB_COLLECTIONS
     bpy.ops.export_scene.gltf(
         filepath=path, export_format="GLB", use_visible=True, export_yup=True, export_apply=True,
-        export_normals=True, export_texcoords=False, export_tangents=False, export_materials="EXPORT",
+        export_normals=True, export_texcoords=True, export_tangents=False, export_materials="EXPORT",
         export_vertex_color="NONE", export_cameras=False, export_lights=False, export_extras=False,
         export_draco_mesh_compression_enable=False, export_animations=False, use_active_scene=True)
     for lc in vl.layer_collection.children:

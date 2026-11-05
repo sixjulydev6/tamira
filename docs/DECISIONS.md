@@ -313,3 +313,37 @@ The supplied bundled-cable material was applied, then rejected by the user and f
 
 - The user asked to remove the background buildings in the wireframe/hairline mode and keep the main ones. The outer-city filler (`filler.js`) no longer draws box outlines. Its solid blocks were already dissolved by the x-ray shader, so the scan now shows only the hero tower and the 36 modelled district buildings that the underground network feeds. In daylight the filler is unchanged. `lidar.js` `boxEdges` is now unused and kept for reference.
 - Checked in muted Comet at 1440×900: wireOn 0.5/1, extend 1, run 0.3. `verify-skyline.mjs` passes.
+
+## 41. Loader: one red core runs in with the real progress (2026-11-05)
+
+- The user asked for a loading screen in the site's design language (checked with taste-skill). The idea: the red Tamira core is the progress bar. It runs in from the left edge at mid-height, its stripped copper tip marking the real progress; at 100% the strands touch the right edge, then run off. The count (Geist Serif, `clamp(4.5rem, 2rem + 12vw, 14rem)`, tabular figures) sits bottom-right; "Running power through the city" (hero sentence size) sits bottom-left. White ground, black ink, flat red insulation in three tones (no gradient or shadow), copper drawn as an SVG strand bundle. The header stays on top, so the wordmark never moves; its nav fades in with the hero intro. The panel then lifts away (800 ms, ease-out-quint) and the existing intro plays.
+- The progress is real and weighted: fonts 10%, hero poster 10%, the 3D chunk 10%, `city-v2.glb` bytes 60% (Vercel serves it brotli-compressed with no length, so it falls back to the decoded 5,520,344 bytes) and the first render 10%. It is shown for at least 0.9 s and holds at 99 until done; after 15 s it finishes anyway. With the loader up, the 3D now starts at once instead of at idle. Lenis and page scroll are stopped while it shows.
+- Fallbacks: without script it never shows (`html.is-loading` is set by an inline head script). Under reduced motion it finishes on fonts + poster and fades out with no travel. A failed 3D load goes static and finishes the same way. Dev only: `?loaderhold=0.64` holds it for review.
+- Files: `src/loader.js`, the `.loader` block in `index.html` and `style.css`, progress getters in `skyline/index.js` and `scene.js`, wiring in `main.js`.
+- Checked in muted Comet at 1440×900, 768×1024 and 390×844 (held at 64%, 99%, 20%), the live sequence (45 → 99 → 100 → lift → hero) and reduced motion. `verify-skyline.mjs` passes. taste-skill `lint.mjs` on `src/loader.js` has 0 FAIL / 0 WARN. The site-wide lint flags only the existing sky gradient, frosted header and button shadows, which are left as they are.
+- Found while checking (it predates the loader, not fixed): in the reduced-motion static page the opaque `poster-desktop.jpg` covers the hero headline (`.hero__title` z-index 1 sits under `.hero__opening`).
+- **Slowed 2026-11-05 (the user found it fast):**
+  - The shown value now eases at a frame-rate-independent rate (3.2/s) with a speed limit of 55% of the screen per second, so a cached load still glides.
+  - It is shown for at least 2.2 s and holds 350 ms at 100%.
+  - The tip runs off over 900 ms (ease in-out). The lift starts as the copper clears the edge and runs for 1.3 s (ease in-out).
+  - The hero intro is slower too: lines 1.15 s with a 0.09 s stagger, the sentence at 0.12 s, the action at 0.5 s with a softer settle, the nav from 0.1 s.
+  - A local reload measures: 16% at 0.45 s, 99% at 2.65 s, 100% at 2.9 s, lift at ~3.9 s, gone at ~5.2 s.
+
+## 42. Hero reveal after the loader (2026-11-05)
+
+- The user asked for reveal animations once the loader uncovers the hero. Before this, the intro played as the panel started lifting, mostly hidden under it. Now `loader.onRevealed` fires 55% into the lift, once the headline is uncovered, and the reveal plays in view.
+- `splitWords()` (main.js) wraps the headline's and sentence's words in `<span class="word">`, with the spaces kept as text. Then:
+  - headline words rise 115% out of their line masks (1.25 s, power4.out, 0.07 s apart);
+  - sentence words drift up 14 px and fade (0.9 s, 0.018 s apart, from 0.45 s);
+  - the nav panel settles down 12 px (from 0.15 s), then its links arrive left to right with Contact us last (0.06 s apart); on phones, the Menu button instead;
+  - "Talk to us" settles in from 0.85 s;
+  - the poster fades over 1.6 s.
+- Transform and opacity only. Reduced motion never runs it (static page).
+- Checked in muted Comet at 1440×900 and 390×844 (the phone menu stays closed). `verify-skyline.mjs` passes.
+- **Sped up the same day (the user asked for it a bit faster):** the reveal starts 45% into the lift.
+  - Headline words: 0.85 s, 0.045 s apart.
+  - Sentence words: 0.65 s, 0.012 s apart, from 0.28 s.
+  - Nav panel: 0.6 s from 0.3 s, so it doesn't show over the loader's count; links 0.5 s, 0.04 s apart, from 0.4 s.
+  - "Talk to us": 0.65 s from 0.55 s.
+  - Poster: 1.1 s.
+  - The whole reveal now finishes in about 1.2 s.

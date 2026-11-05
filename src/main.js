@@ -5,6 +5,7 @@ import "lenis/dist/lenis.css";
 import { SEGMENTS, TOTAL_SCREENS, local, smooth, windowed, lerp, progressOf } from "./story/timeline.js";
 import { createRoom } from "./story/room.js";
 import { createLiveRoom } from "./story/room-live.js";
+import { createLoader } from "./loader.js";
 
 // The room at the end: the 48 rendered images on every device (user direction, DECISIONS 34: the live
 // GLB room was breaking). ?room=glb opens the GLB room on desktop for development only.
@@ -17,6 +18,24 @@ import { CHAPTERS, LABELS, GAUGE } from "./story/chapters.js";
 gsap.registerPlugin(ScrollTrigger);
 
 const root = document.documentElement;
+
+/* ------------------------------------------------------------------ loader */
+// Real progress, weighted: fonts 10%, the hero poster 10%, the 3D chunk 10%, the city GLB's bytes
+// 60%, its first render 10%. The static path (reduced motion, no WebGL) finishes on fonts + poster.
+const loader = createLoader(document.querySelector(".loader"));
+const loadState = { fonts: 0, poster: 0, chunk: 0, city: 0, ready: 0 };
+const updateLoader = () => {
+  const l = loadState;
+  loader.set(l.fonts * 0.1 + l.poster * 0.1 + l.chunk * 0.1 + l.city * 0.6 + l.ready * 0.1);
+};
+document.fonts.ready.then(() => { loadState.fonts = 1; updateLoader(); });
+{
+  const poster = document.querySelector(".hero__opening");
+  const posterDone = () => { loadState.poster = 1; updateLoader(); };
+  if (!poster || poster.complete) posterDone();
+  else { poster.addEventListener("load", posterDone, { once: true }); poster.addEventListener("error", posterDone, { once: true }); }
+}
+const finishWhenStatic = () => Promise.all([document.fonts.ready, new Promise((r) => { const t = setInterval(() => { if (loadState.poster) { clearInterval(t); r(); } }, 50); })]).then(() => loader.finish());
 
 /* ------------------------------------------------------------------ mobile menu */
 const nav = document.querySelector(".primary-nav");
@@ -63,9 +82,27 @@ const gauge = {
 for (const t of document.querySelectorAll(".gauge__tick"))
   t.style.left = `${((+t.dataset.at - GAUGE.from) / (GAUGE.to - GAUGE.from)) * 100}%`;
 
+/* Wrap each word of an element's text in <span class="word"> (spaces stay as text), so the reveal
+   can move words. Screen readers still read one sentence; runs once per element. */
+function splitWords(selector) {
+  for (const el of document.querySelectorAll(selector)) {
+    if (el.dataset.split) continue;
+    el.dataset.split = "1";
+    const words = el.textContent.trim().split(/\s+/);
+    el.textContent = "";
+    words.forEach((w, i) => {
+      if (i) el.append(" ");
+      const span = document.createElement("span");
+      span.className = "word"; span.textContent = w;
+      el.append(span);
+    });
+  }
+}
+
 /* ------------------------------------------------------------------ static fallback (reduced motion, or no WebGL) */
 const storyEl = document.querySelector(".story");
 function goStatic() {
+  finishWhenStatic();
   storyEl.classList.add("is-static");
   root.classList.add("is-static");
   root.classList.remove("is-dark");
@@ -101,15 +138,25 @@ function runStory() {
   const lenisRaf = (time) => lenis.raf(time * 1000);
   gsap.ticker.add(lenisRaf);
   gsap.ticker.lagSmoothing(0);
+  if (loader.active) { lenis.stop(); loader.onDone(() => { if (!disposed) { lenis.start(); ScrollTrigger.refresh(); } }); }
 
-  /* page-load moment (once), timed as the reference: masked lines rise 110% over 0.8s with a 0.05s
-     stagger, the sentence with them; the action pops in from 0.4s */
-  gsap.timeline({ defaults: { ease: "power2.out" } })
-    .from(".site-header", { autoAlpha: 0, y: -8, duration: 0.6 }, 0)
-    .from(".hero__title .line__inner", { yPercent: 110, duration: 0.8, stagger: 0.05 }, 0)
-    .from(".hero__lede", { autoAlpha: 0, y: 24, duration: 0.8 }, 0)
-    .from(".hero__cta", { autoAlpha: 0, y: 20, scale: 0.9, duration: 0.6, ease: "back.out(1.7)" }, 0.4)
-    .from(".hero__rise", { opacity: 0, duration: 1.2, ease: "power2.out" }, 0.15);   // opacity only (render() owns its visibility); not the stage, whose opacity would lift the headline over the tower
+  /* Hero reveal, once, as the loader's panel clears (loader.onRevealed):
+     - headline: each word rises out of its line's mask, 0.045s apart (on phones the lines run on
+       without masks, so the words also fade);
+     - sentence: its words drift up 14px and fade in, 0.012s apart, starting under the headline;
+     - nav: the panel settles down into place, then its links arrive left to right, Contact us last
+       (phones: the Menu button);
+     - the action settles in last. Transform and opacity only; the header itself never moves. */
+  splitWords(".hero__title .line__inner");
+  splitWords(".hero__lede");
+  const desktopNav = matchMedia("(min-width: 1024px)").matches;
+  const intro = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } })
+    .from(".hero__title .word", { yPercent: 115, opacity: 0, duration: 0.85, stagger: 0.045, ease: "power4.out", clearProps: "transform,opacity" }, 0)
+    .from(".hero__lede .word", { y: 14, opacity: 0, duration: 0.65, stagger: 0.012, clearProps: "transform,opacity" }, 0.28)
+    .from(".primary-nav", { autoAlpha: 0, y: -12, duration: 0.6, clearProps: "transform" }, 0.3)   // after the loader's count has cleared the top
+    .from(desktopNav ? ".nav-list > li" : ".menu-toggle", { autoAlpha: 0, y: -8, duration: 0.5, stagger: 0.04, clearProps: "transform" }, 0.4)
+    .from(".hero__rise", { opacity: 0, duration: 1.1, ease: "power2.out" }, 0);   // opacity only (render() owns its visibility); not the stage, whose opacity would lift the headline over the tower
+  loader.onRevealed(() => { if (!disposed) intro.play(); });
 
   /* Live street-level city → isometric daylight → wireframe; stills are fallbacks only. */
   const dayImage = document.querySelector(".hero__poster");
@@ -117,9 +164,9 @@ function runStory() {
   const riseLayer = document.querySelector(".hero__rise");
   const heroStage = document.querySelector(".hero__stage");
   const heroCopy = document.querySelector(".hero__copy");
-  // the lift is applied to the headline, sentence and action, not their wrappers: opacity/translate on
+  // the lift is applied to the headline and sentence, not their wrappers: opacity/translate on
   // the wrapper would flatten them into one layer under the city canvas (the sentence must stay above it)
-  const heroParts = [".hero__title", ".hero__lede", ".hero__aside"].map((q) => document.querySelector(q));
+  const heroParts = [".hero__title", ".hero__lede"].map((q) => document.querySelector(q));
   const storyStage = document.querySelector(".story__stage");
   let frameInset = 12, frameRadius = 20;
   const measureFrame = () => {
@@ -137,6 +184,7 @@ function runStory() {
   let story = null;
   const load = () => import("./story/scene.js").then(({ createStory }) => {
     if (disposed) return;
+    loadState.chunk = 1; updateLoader();
     try {
       story = createStory({ canvas, wireCanvas, stage: heroStage, media: dayImage });
       render(state.p);
@@ -146,7 +194,9 @@ function runStory() {
       master.scrollTrigger?.kill(); master.pause(); goStatic();
     }
   }).catch(err => { if (!disposed) { console.warn("3D failed to load", err); master.scrollTrigger?.kill(); master.pause(); goStatic(); } });
-  if ("requestIdleCallback" in window) requestIdleCallback(load, { timeout: 1500 }); else setTimeout(load, 300);
+  // with the loader up the 3D starts at once; otherwise (loader already gone) after first paint
+  if (loader.active) load();
+  else if ("requestIdleCallback" in window) requestIdleCallback(load, { timeout: 1500 }); else setTimeout(load, 300);
 
   const state = { p: 0 };
   let lastBg = "";
@@ -156,6 +206,10 @@ function runStory() {
   const animateTraffic = (_time, deltaMs) => {
     if (story?.error && !storyEl.classList.contains("is-static")) {
       master.scrollTrigger?.kill(); master.pause(); goStatic(); return;
+    }
+    if (story && loader.active) {
+      loadState.city = story.progress; loadState.ready = story.ready ? 1 : 0; updateLoader();
+      if (story.ready) loader.finish();
     }
     if (story?.ready && !storyEl.classList.contains("is-live-3d")) {
       storyEl.classList.add("is-live-3d"); render(state.p);

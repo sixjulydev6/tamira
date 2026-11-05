@@ -135,7 +135,14 @@ export function createTowerRoom() {
   // Replaces the box room once loaded; on failure the box room stays.
   const load = url => new GLTFLoader().loadAsync(url + 'room-v2.glb').then(gltf => {
     if (disposed) { gltf.scene.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.() }); return }
-    const made = new Map(), nextGlows = []
+    const made = new Map(), nextGlows = [], tl = new THREE.TextureLoader()
+    const tex = (path, srgb) => {
+      const t = tl.load(path + '.jpg')
+      t.wrapS = t.wrapT = THREE.RepeatWrapping
+      t.anisotropy = 8
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace
+      return t
+    }
     const materialFor = src => {
       if (made.has(src)) return made.get(src)
       const name = src.name || 'solid'
@@ -145,6 +152,20 @@ export function createTowerRoom() {
         const strength = src.userData?.emissiveStrength ?? src.emissiveIntensity ?? 1
         m = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, side: THREE.DoubleSide })
         nextGlows.push({ mat: m, base: src.emissive.clone().multiplyScalar(Math.min(strength, 14) * (name.startsWith('fabric') ? 0.9 : 0.45)) })
+      } else if (name === 'wood_floorash') {
+        // Poliigon Wood Floor Ash 4186; the floor's UVs count texture repeats (2 m each)
+        const dir = url + 'tex/wood-floor-ash/ash_'
+        m = patchRoom(new THREE.MeshStandardMaterial({
+          map: tex(dir + 'BaseColor', true), roughnessMap: tex(dir + 'Roughness'), normalMap: tex(dir + 'Normal'), roughness: 1, metalness: 0
+        }))
+      } else if (name === 'fabric_curtain') {
+        // Poliigon Fabric Plain Natural Sheer 009; UVs count repeats (0.4 m of cloth each). The mask is
+        // the open weave with a 35% floor baked in, so the sheers stay readable but let the room through.
+        const dir = url + 'tex/fabric-sheer/sheer_'
+        m = patchRoom(new THREE.MeshStandardMaterial({
+          map: tex(dir + 'COL', true), normalMap: tex(dir + 'NRM'), alphaMap: tex(dir + 'MASK'),
+          transparent: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide
+        }))
       } else {
         m = patchRoom(new THREE.MeshStandardMaterial({ color: src.color, roughness: src.roughness, metalness: Math.min(src.metalness, 0.35), side: src.side }))
       }

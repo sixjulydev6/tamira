@@ -48,7 +48,7 @@ try {
     }
     // UI styles remain the host site's, not the source prototype's.
     const fonts=await page.eval(()=>({heading:getComputedStyle(document.querySelector('.hero__title')).fontFamily,body:getComputedStyle(document.body).fontFamily}));
-    assert(fonts.heading.includes('Geist')&&fonts.body.includes('Instrument'),'Host typography changed');
+    assert(fonts.heading.includes('Georgia')&&fonts.body.includes('Instrument'),'Host typography changed');
     if(process.env.CAPTURE_SKYLINE_POSTERS==='1') {
       await page.eval(()=>{const style=document.createElement('style');style.textContent='.site-header,.hero__copy,.story__copy,.story__labels,.gauge{visibility:hidden!important}.story__stage{clip-path:none!important}';document.head.append(style);});
       await page.screenshot({path:`${out}/poster-${width}.png`,format:'png'});

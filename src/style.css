@@ -3,15 +3,7 @@
    Day → night is driven by one variable, --night (0 → 1), set from scroll.
    ------------------------------------------------------------------ */
 
-/* Geist Serif (Vercel, SIL OFL 1.1: public/fonts/GeistSerif-OFL.txt), self-hosted: it isn't on Google Fonts.
-   From the geist npm package 1.9.0; the variable file, declared at the 400 weight the package ships it as. */
-@font-face {
-  font-family: "Geist Serif";
-  src: url("/fonts/GeistSerifVF.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+/* Headings use Georgia, a system font (macOS, Windows, iOS): nothing to download. */
 
 :root {
   --red: #ea3c32;          /* contact accent (sampled from the reference); the logo carries its own #F45E5E */
@@ -35,7 +27,7 @@
   --pad-x: calc(var(--space) * 5);
   --page-x: max(var(--pad-x), calc((100% - var(--container)) / 2));
   --header-height: 5rem;
-  --font-serif: "Geist Serif", "Times New Roman", Times, serif;   /* headings: hero, chapters, contact, gauge */
+  --font-serif: Georgia, "Times New Roman", Times, serif;   /* headings: hero, chapters, contact, gauge */
   --font-hero: var(--font-serif);
   /* Content edge for everything below the hero copy: the framed city's side margin (same formula as
      main.js layoutFrame), so chapter copy, gauge and contact line up with the frame's edges. */
@@ -115,6 +107,100 @@ a { color: inherit; text-decoration: none; }
   transition: transform 160ms var(--ease-out-quint);
 }
 .skip-link:focus-visible { transform: none; }
+
+/* ------------------------------------------------------------------ loader (src/loader.js) */
+
+/* The page's first beat while the city loads: white ground, black ink, one red core running in from
+   the left with its copper tip at the real progress, the count in the headline face at the right.
+   The header stays on top (its nav fades in with the hero), so the wordmark never moves. */
+.loader { display: none; }
+html.is-loading { overflow: hidden; }
+html.is-loading .loader,
+.loader.is-leaving {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 19;                     /* under the header (20), over the story */
+  background: var(--day-bg);
+  color: var(--day-ink);
+}
+html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
+.loader.is-leaving {
+  translate: 0 -100%;
+  transition: translate 1300ms cubic-bezier(0.65, 0, 0.35, 1);   /* in-out: lifts gently, settles gently (LIFT_MS) */
+  pointer-events: none;
+}
+
+.loader__status {
+  position: absolute;
+  width: 1px; height: 1px;       /* screen-reader text, not a rule: taste-skill-ignore */
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* the core: flat red insulation in three tones (lit top, body, shaded underside), one screen long */
+.loader__wire {
+  --core: clamp(18px, 0.7rem + 1.5vw, 34px);
+  position: absolute;
+  inset: 50% 0 auto;
+  height: var(--core);
+  margin-top: calc(var(--core) / -2);
+  overflow: hidden;
+}
+.loader__cable {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;                     /* translateX(-100%) is fully off; (p - 1) * 100% puts the cut at p */
+  background: var(--action-red);
+  border-radius: 0 3px 3px 0;
+  --p: 0;
+  --tip: calc(var(--core) * 3.3);
+  transform: translate3d(calc((var(--p) - 1) * 100% - var(--p) * var(--tip)), 0, 0);
+  will-change: transform;
+}
+.loader__cable::before,
+.loader__cable::after { content: ""; position: absolute; inset-inline: 0; border-radius: inherit; }
+.loader__cable::before { top: 12%; height: 24%; background: #ea5a4c; }
+.loader__cable { border-right: 3px solid #9d241d; box-sizing: border-box; }   /* the cut face of the insulation */
+.loader__cable::after  { bottom: 0; height: 26%; background: #b32a22; }
+.loader__tip {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: var(--tip);
+  height: 100%;
+  overflow: visible;
+}
+
+/* the sentence at the left, the count at the right, on the hero's content edges */
+.loader__foot {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 var(--hero-x) clamp(1.5rem, 1rem + 2vw, 3rem);
+}
+.loader__line {
+  margin: 0 0 0.5em;
+  font-size: clamp(1.125rem, 1rem + 0.4vw, 1.5rem);    /* the hero sentence's size */
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.loader__count {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(4.5rem, 2rem + 12vw, 14rem);
+  line-height: 0.8;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader.is-leaving { translate: none; opacity: 0; transition: opacity 300ms linear; }
+}
 
 /* ------------------------------------------------------------------ header */
 
@@ -310,17 +396,9 @@ a { color: inherit; text-decoration: none; }
 /* the tight leading would clip descenders inside the reveal mask; pad the mask, pull the next line back */
 .hero__title .line { display: block; overflow: hidden; padding-bottom: 0.16em; margin-bottom: -0.16em; }
 .hero__title .line__inner { display: inline-block; }
+.hero__title .word,
+.hero__lede .word { display: inline-block; }   /* split by main.js for the reveal */
 
-/* the action sits alone at the bottom: right-aligned from 1025px, left below */
-.hero__aside {
-  position: relative;
-  z-index: 3;                      /* above the city canvas */
-  display: flex;
-  justify-content: flex-start;
-}
-@media (min-width: 1025px) {
-  .hero__aside { justify-content: flex-end; }
-}
 
 /* the sentence sits directly under the headline, in the sky; no wrapper z-index, so the
    headline keeps its place behind the rising tower */

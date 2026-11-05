@@ -7,7 +7,6 @@
   <meta name="description" content="Tamira makes wiring and cable for homes, industry and infrastructure.">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preload" href="/fonts/GeistSerifVF.woff2" as="font" type="font/woff2" crossorigin>   <!-- hero headline -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -15,9 +14,36 @@
         imagesrcset="/media/hero-rise-1920.webp 1920w, /media/hero-rise-3840.webp 3840w"
         imagesizes="max(100vw, 178svh)">
   <link rel="stylesheet" href="/src/style.css">
+  <script>document.documentElement.classList.add("is-loading")</script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- Loader (src/loader.js): shown only when script runs. One red core runs in from the left as the
+       page loads; its copper tip and the count are the same real progress. -->
+  <div class="loader" role="status">
+    <span class="loader__status">Loading Tamira</span>
+    <div class="loader__wire" aria-hidden="true">
+      <div class="loader__cable">
+<svg class="loader__tip" viewBox="0 0 80 24" focusable="false">
+          <rect x="0" y="3.5" width="9" height="17" rx="1.5" fill="#b8692f"/>
+          <rect x="4" y="4.20" width="60" height="2.3" rx="1.15" fill="#b8692f" transform="rotate(-6.4 4 5.35)"/>
+          <rect x="4" y="6.05" width="66" height="2.3" rx="1.15" fill="#d48c55" transform="rotate(-4.8 4 7.20)"/>
+          <rect x="4" y="7.90" width="70" height="2.3" rx="1.15" fill="#e2a06a" transform="rotate(-3.2 4 9.05)"/>
+          <rect x="4" y="9.75" width="72" height="2.3" rx="1.15" fill="#c97a43" transform="rotate(-1.6 4 10.90)"/>
+          <rect x="4" y="11.60" width="74" height="2.3" rx="1.15" fill="#e9b07c" transform="rotate(0.0 4 12.75)"/>
+          <rect x="4" y="13.45" width="71" height="2.3" rx="1.15" fill="#c97a43" transform="rotate(1.6 4 14.60)"/>
+          <rect x="4" y="15.30" width="69" height="2.3" rx="1.15" fill="#e2a06a" transform="rotate(3.2 4 16.45)"/>
+          <rect x="4" y="17.15" width="65" height="2.3" rx="1.15" fill="#d48c55" transform="rotate(4.8 4 18.30)"/>
+          <rect x="4" y="19.00" width="58" height="2.3" rx="1.15" fill="#b8692f" transform="rotate(6.4 4 20.15)"/>
+        </svg>
+      </div>
+    </div>
+    <div class="loader__foot" aria-hidden="true">
+      <p class="loader__line">Running power through the city</p>
+      <p class="loader__count"><span class="loader__count-value">0</span>%</p>
+    </div>
+  </div>
 
   <header class="site-header" data-reveal="header">
     <a class="wordmark" href="/" aria-label="Tamira home"><img src="/tamira-logo.svg" alt="" width="876" height="145"></a>
@@ -70,9 +96,6 @@
               <span class="line"><span class="line__inner">you never think about</span></span>
             </h1>
             <p class="hero__lede">Tamira makes copper house wire for homes and buildings: safe, flexible, and built to last.</p>
-          </div>
-          <div class="hero__aside">
-            <a class="btn hero__cta" href="#contact"><span class="btn__label">Talk to us</span><span class="btn__arrow" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
           </div>
         </div>
 

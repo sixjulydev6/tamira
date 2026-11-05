@@ -25,6 +25,21 @@ import { DepthBlurPass } from './depth-blur.js';
 const SUN_AZ=46*Math.PI/180; // runtime sun azimuth, 0 = +Z, 90 = +X (matches update())
 const HERO_C=new THREE.Vector3(64,100,10); // focal tower centre (layout.js HERO)
 const DAY_ENV_GAIN=1.6; // HDRI sky radiance -> the gradient environment's level
+// Image-textured city materials (build_skyline.py TEXTURED; Poliigon licence, see SKYLINE-HERO.md). Paths
+// under public/skyline/tex/. Facade numbers mirror the Blender bands: office v 0.300..0.973 repeating every
+// 5 storeys, shopfront v 0..0.300 held to the podium; roughness glass 0.06 / panels 0.65.
+const PHONE_TREES=1500; // kit trees drawn on coarse-pointer devices (desktop draws all 3,000)
+const OFFICE={v0:.30005,vspan:.6726,repeat:true,rough:[.06,.65]};
+const CITY_TEX={
+  brick_reclaimed:{map:'brick-reclaimed/brick_COL',normal:'brick-reclaimed/brick_NRM',rough:'brick-reclaimed/brick_ROUGH'},
+  glass_blue:{map:'facade-office/facade_COL',facade:OFFICE},
+  glass_grey:{map:'facade-office/facade_COL',facade:OFFICE},
+  glass_warm:{map:'facade-office/facade_COL',facade:OFFICE},
+  glass_store:{map:'facade-office/facade_COL',facade:{v0:0,vspan:.3,repeat:false,rough:[.06,.65]}},
+  // park trees (prepare_tree.py kit from the BlenderKit "A tree"): foliage-cluster atlas as a cutout, bark colour + normal
+  leaf_ash:{map:'tree-ash/leaf_COL.png',cutout:.3,tint:[.62,.72,.5]}, // low cutoff: mip levels average the alpha down, so distant crowns would thin out
+  bark_ash:{map:'tree-ash/bark_COL',normal:'tree-ash/bark_NRM'},
+};
 
 // Vanilla Three.js adaptation of the supplied temira city/room sequence. It uses
 // the existing city renderer and master scroll clock, with no second UI/runtime.
@@ -85,9 +100,12 @@ export function createSkyline(renderer) {
   const url=import.meta.env.BASE_URL+'skyline/';
   // Sky reflections for the city only (the cable bridge keeps its own RoomEnvironment).
   const cityEnvTarget=buildCityEnvironment(renderer),cityEnv=cityEnvTarget.texture;
-  const cityMaterials=[];
-  let entryMeshes=[];
-  const ready=new GLTFLoader().loadAsync(url+'city-v2.glb')
+  const cityMaterials=[],texLoader=new THREE.TextureLoader();
+  let entryMeshes=[];const kitTrees=[];
+  // load progress for the page loader: Vercel serves the GLB brotli-compressed with no length, so
+  // fall back to the decoded size (city-v2.glb is 5,518,064 bytes)
+  let progress=0;
+  const ready=new GLTFLoader().loadAsync(url+'city-v2.glb',e=>{progress=Math.min(1,e.loaded/(e.lengthComputable&&e.total?e.total:5518064));})
     .then(gltf=>{
       if(disposed){gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose?.();});return;}
       gltf.scene.updateMatrixWorld(true);
@@ -100,7 +118,32 @@ export function createSkyline(renderer) {
         const name=src.name||'solid',cls=classOf(name),glass=cls==='glass',water=name.startsWith('water');
         const m=new THREE.MeshStandardMaterial({color:src.color,roughness:glass?Math.max(.06,src.roughness):src.roughness,metalness:src.metalness,
           envMap:cityEnv,envMapIntensity:glass||water?1.15:src.metalness>.5?.8:.32,side:glass?THREE.DoubleSide:THREE.FrontSide});
-        m.name=name;m.userData.env=m.envMapIntensity;patchCityMaterial(m,{cls});cityMaterials.push(m);made.set(src,m);src.dispose();return m;
+        const t=CITY_TEX[name];let facade=null;
+        if(t){ // image textures (Poliigon city surfaces on the box UVs from build_skyline.py; park tree kit UVs); glTF convention, so flipY off
+          const tex=(f,srgb)=>{const x=texLoader.load(url+'tex/'+f+(/\.\w+$/.test(f)?'':'.jpg'));x.flipY=false;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.anisotropy=8;if(srgb)x.colorSpace=THREE.SRGBColorSpace;return x;};
+          m.color.set(0xffffff);if(t.tint)m.color.setRGB(...t.tint);m.map=tex(t.map,true);
+          if(t.normal)m.normalMap=tex(t.normal);
+          if(t.rough){m.roughnessMap=tex(t.rough);m.roughness=1;}
+          if(t.cutout){m.alphaTest=t.cutout;m.side=THREE.DoubleSide;m.map.wrapS=m.map.wrapT=THREE.ClampToEdgeWrapping;}
+          facade=t.facade||null;
+        }
+        m.name=name;m.userData.env=m.envMapIntensity;patchCityMaterial(m,{cls,facade});cityMaterials.push(m);made.set(src,m);src.dispose();return m;
+      };
+      // Phones draw PHONE_TREES of the 3,000 kit trees. Street, lawn and roof trees all stay; the park and
+      // outer-park groves (ground level, z >= 300 or x < -250, as in build_skyline.py) are thinned evenly by a
+      // position hash, so the leaf and bark primitives of one tree keep or drop together.
+      const phone=matchMedia('(pointer:coarse)').matches;
+      const thinTrees=im=>{
+        const m=new THREE.Matrix4(),p=new THREE.Vector3(),keep=[],grove=[];
+        for(let i=0;i<im.count;i++){
+          im.getMatrixAt(i,m);p.setFromMatrixPosition(m.premultiply(im.matrixWorld));
+          ((p.y<.5&&(p.z>=300||p.x<-250))?grove:keep).push(i);
+        }
+        const k=Math.max(0,Math.min(1,(PHONE_TREES-keep.length)/Math.max(1,grove.length)));
+        for(const i of grove){im.getMatrixAt(i,m);p.setFromMatrixPosition(m);const h=Math.abs(Math.sin(p.x*12.9898+p.z*78.233)*43758.5453)%1;if(h<k)keep.push(i);}
+        keep.sort((a,b)=>a-b);
+        keep.forEach((src,dst)=>{im.getMatrixAt(src,m);im.setMatrixAt(dst,m);});
+        im.count=keep.length;im.instanceMatrix.needsUpdate=true;im.boundingSphere=null;im.boundingBox=null;
       };
       const meshes=[];gltf.scene.traverse(o=>{if(o.isMesh)meshes.push(o);});
       if(!meshes.length)throw new Error('Supplied skyline has no mesh');
@@ -111,6 +154,7 @@ export function createSkyline(renderer) {
         const group=(o.name||'').split('__')[0];
         if(/lobby_glow/.test(o.name))o.visible=false; // interiors sit behind opaque glass in realtime
         const tree=o.isInstancedMesh&&mats.some(m=>/^(leaf|bark)_/.test(m.name));
+        if(o.isInstancedMesh&&mats.some(m=>/_ash$/.test(m.name))){if(phone)thinTrees(o);kitTrees.push(o);}
         o.castShadow=group!=='ground'&&!(o.isInstancedMesh&&!tree);o.receiveShadow=true;
         if(group==='entry')entryMeshes.push(o);
         // scan proxy: facade skins, roofs and the hero's terrace slabs give clean silhouettes;
@@ -244,7 +288,7 @@ export function createSkyline(renderer) {
     for(const root of [scene,bridgeScene,fadeScene])root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)ownedTextures.add(v);}if(o.isInstancedMesh)o.dispose();});
     geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());ownedTextures.forEach(t=>t.dispose());sun.shadow.dispose();environment.dispose();cityEnvTarget.dispose();dayEnvTarget?.dispose();composer.passes.forEach(p=>p.dispose?.());composer.dispose();for(const t of [composer.renderTarget1,composer.renderTarget2])t.depthTexture?.dispose();
   }
-  return {ready,resize,update,render,dispose,bundleAnchors(){return assembly.anchors(bridgeCamera,size.width,size.height);},get loaded(){return loaded;},get error(){return error;},tick(dt){elapsed+=Math.min(dt,.05);update(lastP,lastBg,entry);render();},diagnostics(){return {loaded,error:error?.message,state:{...S},camera:camera.position.toArray(),roomVisible:room.group.visible,roomSource:room.source,entryVisible:entryMeshes.some(o=>o.visible),cityMaterials:cityMaterials.length,dayEnvironment:!!dayEnvTarget,assembly:assembly.diagnostics(),redPosition:bridgeWire.group.position.toArray()};}};
+  return {ready,resize,update,render,dispose,get progress(){return loaded?1:progress;},bundleAnchors(){return assembly.anchors(bridgeCamera,size.width,size.height);},get loaded(){return loaded;},get error(){return error;},tick(dt){elapsed+=Math.min(dt,.05);update(lastP,lastBg,entry);render();},diagnostics(){return {loaded,error:error?.message,state:{...S},camera:camera.position.toArray(),roomVisible:room.group.visible,roomSource:room.source,entryVisible:entryMeshes.some(o=>o.visible),cityMaterials:cityMaterials.length,kitTrees:kitTrees.map(o=>o.count),dayEnvironment:!!dayEnvTarget,assembly:assembly.diagnostics(),redPosition:bridgeWire.group.position.toArray()};}};
 }
 
 // Daylight sky gradient + sun, prefiltered once. Matches atmosphere.js day keys.

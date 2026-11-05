@@ -82,15 +82,38 @@ const FILLER_COLOR = /* glsl */ `
 `
 
 // cls: 'glass' | 'frame' | 'leaf' | 'solid' (material class from the GLB material name prefix)
-export function patchCityMaterial(material, { filler = false, cls = 'solid' } = {}) {
+// Facade elevation on glass (build_skyline.py facade_material): the box UVs carry raw storeys from the
+// band origin, folded here into the office band (repeat) or held in the shopfront band (clamp). textureGrad
+// uses the unfolded coordinate, so mip selection doesn't jump at the fold seam. Roughness follows the
+// image brightness: glass pixels are near black (0.06 glint), panels and blinds 0.65.
+const FACADE_MAP = /* glsl */ `
+#ifdef USE_MAP
+{
+  vec2 f_raw = vec2(vMapUv.x, 1. - vMapUv.y);                 // Blender v (glTF flips it)
+  float f_v = uFacade.z > .5 ? fract(f_raw.y) : min(f_raw.y, .999);
+  vec2 f_uv = vec2(f_raw.x, 1. - (f_v * uFacade.y + uFacade.x));
+  vec2 f_d = vec2(1., uFacade.y);
+  vec4 sampledDiffuseColor = textureGrad(map, f_uv, dFdx(f_raw) * f_d, dFdy(f_raw) * f_d);
+  diffuseColor *= sampledDiffuseColor;
+  tFacLum = dot(sampledDiffuseColor.rgb, vec3(.2126, .7152, .0722));
+}
+#endif
+`
+
+export function patchCityMaterial(material, { filler = false, cls = 'solid', facade = null } = {}) {
   material.defines = Object.assign(material.defines || {}, {
     T_GLASS: cls === 'glass' ? '1.' : '0.',
     T_FRAME: cls === 'frame' ? '1.' : '0.',
     T_LEAF: cls === 'leaf' ? '1.' : '0.'
   })
   if (filler) material.defines.T_FILLER = ''
+  // facade: { v0, vspan, repeat, rough: [glass, panel] }
+  const facadeU = facade && {
+    uFacade: { value: new THREE.Vector3(facade.v0, facade.vspan, facade.repeat ? 1 : 0) },
+    uFacRough: { value: new THREE.Vector2(...facade.rough) }
+  }
   material.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, CITY_U)
+    Object.assign(sh.uniforms, CITY_U, facadeU || {})
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vW;\nvarying vec3 vWN;')
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -124,12 +147,18 @@ export function patchCityMaterial(material, { filler = false, cls = 'solid' } = 
         if (tCe > 0.) discard;
         float tCg = (uCut > 0. && uCut < 1.) ? exp(-tCe * tCe * 30.) : 0.;`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${FILLER_COLOR}`)
+    if (facadeU) sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uFacade;\nuniform vec2 uFacRough;')
+      .replace('#include <map_fragment>', `float tFacLum = 0.;\n${FACADE_MAP}`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        roughnessFactor = mix(uFacRough.x, uFacRough.y, clamp((tFacLum - .02) / .18, 0., 1.));`)
+    sh.fragmentShader = sh.fragmentShader
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         ${NIGHT}
         totalEmissiveRadiance += vec3(.7, .86, 1.) * tScan * 1.3 + vec3(1., .5, .2) * tCg * 2.4;`)
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb *= 1. - uDim;\n#include <fog_fragment>\ngl_FragColor.rgb = tHorizon(gl_FragColor.rgb, vW);')
   }
-  material.customProgramCacheKey = () => `temira-city-${cls}${filler ? '-filler' : ''}`
+  material.customProgramCacheKey = () => `temira-city-${cls}${filler ? '-filler' : ''}${facade ? '-facade' : ''}`
   return material
 }
 

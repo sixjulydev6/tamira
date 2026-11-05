@@ -242,6 +242,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   return {
     update, resize, dispose,
     get ready() { return skyline.loaded; },
+    get progress() { return skyline.progress; },
     get error() { return skyline.error; },
     tick(delta) {
       if (disposed || local(lastProgress, "wireIn") >= .5 || document.hidden) return;

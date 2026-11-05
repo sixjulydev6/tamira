@@ -27,7 +27,7 @@ The layout, spacing and type metrics are adapted from **arrakis.tech**. They wer
 
 ### Composition rule: words left, object right
 - **Hero (DECISIONS 27):** a rounded media frame (`--frame-inset`, `--frame-radius`) holds the live street-level city on a daylight sky gradient (`--sky-top` `#d6e0e7` → `--sky-bottom` `#eef0ee`), with a white page surround. The headline sits top-left under the wordmark with the sentence directly under it, over the sky (`.hero__head`). The action sits alone at the bottom: right-aligned from 1025px, left-aligned below. The crown tower still layers in front of the headline. The sky-coloured haze behind the sentence was removed on 2026-11-05 at the user's request; the sentence now sits over clear sky, so it doesn't need one. On the first scroll the frame's inset and radius open to zero over `rise` 0–0.35 while the copy lifts; the sky fades into the page colour over `rise` 0.55–0.95, so the wireframe handover is unchanged.
-- **Hero headline:** Geist Serif 400, `clamp(40px, 1.52rem + 3.36vw, 89.6px)` (73px at 1440; reduced 20% on 2026-11-05), line-height 1, tracking −0.03em, max-width 10.6em (two lines on desktop; runs on at 860px and below).
+- **Hero headline:** Georgia 400, `clamp(40px, 1.52rem + 3.36vw, 89.6px)` (73px at 1440; reduced 20% on 2026-11-05), line-height 1, tracking −0.03em, max-width 10.6em (two lines on desktop; runs on at 860px and below).
 - **Hero sentence:** Instrument Sans, 18 → 24px, line-height 1.25, max-width 30rem, full ink.
 - **Action (`.btn`):** a 48px two-part button: a dark `#1b1b22` label (13px uppercase Instrument Sans 500, 0.06em) and a red `#d9362c` arrow block, with parallel 10px slanted edges and a 3px gap. On hover the colours swap and the arrow moves 3px. Preserve the existing Tamira copy and destination.
 - **Chapter copy:** upper-left, in a column about 31rem wide: title, then body, then a spec line.
@@ -37,7 +37,7 @@ The layout, spacing and type metrics are adapted from **arrakis.tech**. They wer
 ## Type
 
 Fonts are **stand-ins** until the client supplies a brand font (the logo is final, see the header):
-- **Geist Serif** (400, `--font-serif`) for every heading: the hero headline, chapter titles, the Contact title and the gauge number. Vercel's open-source serif (SIL OFL), self-hosted as `public/fonts/GeistSerifVF.woff2` (40 KB, preloaded) because it isn't on Google Fonts. Licence: `public/fonts/GeistSerif-OFL.txt`.
+- **Georgia** (400, `--font-serif`: Georgia, "Times New Roman", Times, serif) for every heading: the hero headline, chapter titles, the Contact title and the gauge number. A system font on macOS, Windows and iOS, so nothing is downloaded; Android/Linux fall back to their default serif. Replaced Geist Serif on 2026-11-05 at the user's request; the unused Geist files remain in `public/fonts/`.
 - **Instrument Sans** (400 / 500) for UI and copy.
 
 Instrument Sans comes from Google Fonts.
@@ -48,8 +48,8 @@ Each size runs linearly from a 480px to a 1280px viewport, then holds.
 | Token | Size | Used for |
 |---|---|---|
 | Hero `.hero__title` | 40 → 89.6px (`clamp(2.5rem, 1.52rem + 3.36vw, 5.6rem)`) | leading 1, tracking −0.03em; overrides the legacy `--text-display` token |
-| `--text-heading-48` | 28 → 48px | end title, gauge number (Geist Serif) |
-| `--text-heading-40` | 26 → 40px | chapter titles (Geist Serif) |
+| `--text-heading-48` | 28 → 48px | end title, gauge number (Georgia) |
+| `--text-heading-40` | 26 → 40px | chapter titles (Georgia) |
 | `--text-body-20` | 17 → 20px | (available) |
 | `--text-body-18` | 16 → 18px | chapter body, end body |
 | `--text-body-15` | 15px | spec lines, label values |
