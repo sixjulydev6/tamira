@@ -55,7 +55,9 @@ try {
     }
     await page.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await wait(300);
     assert(await page.eval(()=>document.querySelector('.story').classList.contains('is-static')),'Reduced motion fallback failed');
-    await page.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});await wait(2200);
+    await page.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+    // the GLB city + HDRI take ~2.5-3.5 s to rebuild in Comet; poll instead of a fixed wait
+    for(const t0=Date.now();Date.now()-t0<15000&&!(await page.eval(()=>window.__tamira?.diagnostics().skyline?.loaded));)await wait(250);
     assert(await page.eval(()=>window.__tamira?.diagnostics().skyline?.loaded),'Scene did not rebuild after reduced motion');
     assert(!page.consoleErrors.length,page.consoleErrors.join('\n'));
     results.push({width,height,fonts,samples,exceptions:page.consoleErrors});await page.close();

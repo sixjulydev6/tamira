@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { NOISE, XRAY_UNIFORMS, XRAY_FUNCS } from './glsl.js'
+import { NOISE, XRAY_UNIFORMS, XRAY_FUNCS, HORIZON } from './glsl.js'
 import { HERO, CUT, FLOOR } from './layout.js'
 
 // one set of uniform objects shared by every city material (solid, ghost, outlines, filler)
@@ -19,26 +19,34 @@ export const CITY_U = {
   uFloorH: { value: FLOOR.h },
   uFloors: { value: FLOOR.n },
   uGhost: { value: 0 },
-  uEdge: { value: 0 }
+  uEdge: { value: 0 },
+  // sky terms mirrored from the dome each frame (index.js) for the horizon fade
+  uSkyZen: { value: new THREE.Color() }, uSkyMid: { value: new THREE.Color() }, uSkyHor: { value: new THREE.Color() },
+  uSkySun: { value: new THREE.Color() }, uSkySunDir: { value: new THREE.Vector3(0, 1, 0) }, uSkyGlow: { value: new THREE.Color() },
+  uSkyNight: { value: 0 }, uSkyXray: { value: 0 }, uSkyDim: { value: 0 }, uHzNear: { value: 1150 }, uHzFar: { value: 2300 }
 }
 
-// Night, read from the model's own facades: rooms light up behind the texture's glass panes,
-// the focal tower's frame catches warm architectural light, and the glass holds the twilight sky.
+// Night, driven by semantic material classes from the Blender kit (art/blender/skyline):
+// rooms light up behind real glass panes, the focal tower's stone frame catches warm
+// architectural light, and the glass holds the twilight sky. Filler blocks derive their
+// glazing from a storey grid instead of an atlas.
 const NIGHT = /* glsl */ `
 {
-  vec3 n_s = pow(max(diffuseColor.rgb, vec3(0.)), vec3(1. / 2.2));
-  float n_l = dot(n_s, vec3(.299, .587, .114));
-  float n_glass = smoothstep(.0, .08, n_s.b - n_s.r) * (1. - smoothstep(.55, .75, n_l));
-  float n_green = smoothstep(.02, .08, n_s.g - max(n_s.r, n_s.b));
   vec3 n_n = normalize(vWN);
   float n_vert = 1. - smoothstep(.3, .6, abs(n_n.y));
+  float n_glass = T_GLASS;
+  #ifdef T_FILLER
+    float n_fb = fract(vW.y / 3.6);
+    n_glass = step(.3, n_fb) * step(n_fb, .9) * n_vert;
+  #endif
+  float n_green = T_LEAF;
   vec2 n_t = normalize(vec2(-n_n.z, n_n.x) + vec2(1e-4));
   float n_u = dot(vW.xz, n_t);
   // individual window panes on a world grid, switched on room by room
-  vec2 n_pane = vec2(n_u / 2.1, (vW.y - .6) / 3.5);
+  vec2 n_pane = vec2(n_u / 2.4, vW.y / 3.6);
   vec2 n_pf = fract(n_pane);
-  float n_win = smoothstep(.06, .14, n_pf.x) * smoothstep(.94, .86, n_pf.x) * smoothstep(.1, .2, n_pf.y) * smoothstep(.92, .84, n_pf.y);
-  vec2 n_room = floor(vec2(n_u / 6.3, (vW.y - .6) / 3.5));
+  float n_win = smoothstep(.04, .1, n_pf.x) * smoothstep(.96, .9, n_pf.x) * smoothstep(.06, .14, n_pf.y) * smoothstep(.98, .9, n_pf.y);
+  vec2 n_room = floor(vec2(n_u / 7.2, vW.y / 3.6));
   vec2 n_key = n_room + floor(n_n.xz * 2. + .5) * 57.3;
   float n_id = tHash12(n_key);
   float n_on = step(n_id, uLit);
@@ -48,49 +56,53 @@ const NIGHT = /* glsl */ `
   vec3 n_warm = mix(vec3(1., .58, .26), vec3(1., .76, .5), tHash12(n_key + 2.7));
   n_warm = mix(n_warm, vec3(.8, .87, 1.), step(.93, tHash12(n_key + 5.3)));
   float n_pid = tHash12(floor(n_pane) + 1.3);
-  float n_k = (.3 + .7 * tHash12(n_key + 4.4)) * (.55 + .45 * n_pid) * step(.22, n_pid);
-  float n_lit = max(n_glass, .35) * n_win;
-  totalEmissiveRadiance += n_warm * n_lit * n_on * n_vert * (1. - n_green) * n_k * uNight * .95;
+  float n_k = (.3 + .7 * tHash12(n_key + 4.4)) * (.85 + .15 * n_pid);
+  totalEmissiveRadiance += n_warm * n_glass * n_win * n_on * n_vert * (1. - n_green) * n_k * uNight * 1.1;
   // warm architectural light washing up the focal tower's frame
   float n_hero = tInside(vW, uHeroMin, uHeroMax) ? 1. : 0.;
-  float n_frame = (1. - n_glass) * smoothstep(.45, .66, n_l) * n_vert * (1. - n_green);
-  totalEmissiveRadiance += vec3(1., .68, .38) * n_frame * n_hero * uNight * (.22 + .28 * smoothstep(40., 200., vW.y));
+  float n_frame = T_FRAME * n_vert * (1. - n_green);
+  totalEmissiveRadiance += vec3(1., .68, .38) * n_frame * n_hero * uNight * (.03 + .07 * smoothstep(40., 200., vW.y));
   // the twilight sky held in the glass
   float n_fr = pow(1. - abs(dot(n_n, normalize(cameraPosition - vW))), 3.);
   float n_sky = .55 + .45 * smoothstep(0., 160., vW.y);
-  totalEmissiveRadiance += vec3(.07, .13, .32) * max(n_glass, .25) * n_vert * (.35 + n_fr * 1.6) * n_sky * uNight * .55;
+  totalEmissiveRadiance += vec3(.07, .13, .32) * max(n_glass, .12) * n_vert * (1. - n_green) * (.35 + n_fr * 1.6) * n_sky * uNight * .55;
 }
 `
 
-// filler buildings borrow facade patches from the city's own texture atlas
-const FILLER_UV = /* glsl */ `
-#if defined(USE_INSTANCING) && defined(USE_MAP)
+// filler blocks: storey bands of dark glazing between light spandrels, from world height
+const FILLER_COLOR = /* glsl */ `
+#ifdef T_FILLER
 {
-  vec3 f_o = instanceMatrix[3].xyz;
-  vec3 f_s = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
-  float f_h = fract(sin(dot(f_o.xz, vec2(12.9898, 78.233))) * 43758.5453);
-  vec2 f_base = vec2(.1 + fract(f_h * 7.13) * .7, .2 + fract(f_h * 3.71) * .55);
-  float f_w = abs(normal.x) > .5 ? f_s.z : f_s.x;
-  vMapUv = f_base + uv * vec2(f_w, f_s.y) / 520.;
-  if (abs(normal.y) > .5) vMapUv = f_base + uv * .01;
+  float f_fb = fract(vW.y / 3.6);
+  float f_vert = 1. - smoothstep(.3, .6, abs(normalize(vWN).y));
+  float f_g = step(.3, f_fb) * step(f_fb, .9) * f_vert;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.05, .07, .1), f_g * .75);
 }
 #endif
 `
 
-export function patchCityMaterial(material, { filler = false } = {}) {
+// cls: 'glass' | 'frame' | 'leaf' | 'solid' (material class from the GLB material name prefix)
+export function patchCityMaterial(material, { filler = false, cls = 'solid' } = {}) {
+  material.defines = Object.assign(material.defines || {}, {
+    T_GLASS: cls === 'glass' ? '1.' : '0.',
+    T_FRAME: cls === 'frame' ? '1.' : '0.',
+    T_LEAF: cls === 'leaf' ? '1.' : '0.'
+  })
+  if (filler) material.defines.T_FILLER = ''
   material.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, CITY_U)
     sh.vertexShader = sh.vertexShader
-      .replace('#include <uv_vertex>', filler ? `#include <uv_vertex>\n${FILLER_UV}` : '#include <uv_vertex>')
       .replace('#include <common>', '#include <common>\nvarying vec3 vW;\nvarying vec3 vWN;')
       .replace('#include <project_vertex>', `#include <project_vertex>
         vec4 tW4 = vec4(transformed, 1.0);
+        vec3 tN = objectNormal;
         #ifdef USE_INSTANCING
           tW4 = instanceMatrix * tW4;
+          tN = mat3(instanceMatrix) * tN;
         #endif
         tW4 = modelMatrix * tW4;
         vW = tW4.xyz;
-        vWN = normalize(mat3(modelMatrix) * objectNormal);`)
+        vWN = normalize(mat3(modelMatrix) * tN);`)
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         varying vec3 vW;
@@ -101,7 +113,8 @@ export function patchCityMaterial(material, { filler = false } = {}) {
         uniform float uDim;
         ${XRAY_UNIFORMS}
         ${NOISE}
-        ${XRAY_FUNCS}`)
+        ${XRAY_FUNCS}
+        ${HORIZON}`)
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
         float tXr = tXrayAmount(vW);
         float tFd = tFront(vW, tXr);
@@ -110,12 +123,13 @@ export function patchCityMaterial(material, { filler = false } = {}) {
         float tCe = tCut(vW);
         if (tCe > 0.) discard;
         float tCg = (uCut > 0. && uCut < 1.) ? exp(-tCe * tCe * 30.) : 0.;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\n${FILLER_COLOR}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         ${NIGHT}
         totalEmissiveRadiance += vec3(.7, .86, 1.) * tScan * 1.3 + vec3(1., .5, .2) * tCg * 2.4;`)
-      .replace('#include <fog_fragment>', 'gl_FragColor.rgb *= 1. - uDim;\n#include <fog_fragment>')
+      .replace('#include <fog_fragment>', 'gl_FragColor.rgb *= 1. - uDim;\n#include <fog_fragment>\ngl_FragColor.rgb = tHorizon(gl_FragColor.rgb, vW);')
   }
-  material.customProgramCacheKey = () => (filler ? 'temira-filler' : 'temira-city')
+  material.customProgramCacheKey = () => `temira-city-${cls}${filler ? '-filler' : ''}`
   return material
 }
 

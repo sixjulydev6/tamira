@@ -45,3 +45,28 @@ float tCut(vec3 p){
   return k - s * 1.6;
 }
 `
+
+// Horizon fade: distant geometry dissolves into the sky dome's own colour for its view
+// direction (same terms as atmosphere.js SKY_FRAG, without clouds or stars), so the city and
+// ground have no hard edge against the sky.
+export const HORIZON = /* glsl */ `
+uniform vec3 uSkyZen; uniform vec3 uSkyMid; uniform vec3 uSkyHor; uniform vec3 uSkySun; uniform vec3 uSkySunDir; uniform vec3 uSkyGlow;
+uniform float uSkyNight; uniform float uSkyXray; uniform float uSkyDim; uniform float uHzNear; uniform float uHzFar;
+vec3 tSky(vec3 d){
+  float h = d.y, hh = 1. - clamp(h, 0., 1.);
+  vec3 col = mix(uSkyZen, uSkyMid, smoothstep(0., 1., pow(hh, 2.2)));
+  col = mix(col, uSkyHor, pow(hh, 14.));
+  float side = pow(max(dot(normalize(d.xz + 1e-5), normalize(uSkySunDir.xz + 1e-5)), 0.), 2.);
+  col = mix(col, uSkyHor, side * pow(hh, 3.) * .3 * (1. - uSkyNight));
+  col = mix(col, uSkyHor * .8, smoothstep(0., -.12, h));
+  float sd = max(dot(d, uSkySunDir), 0.);
+  col += uSkySun * (pow(sd, 14.) * .32 + pow(sd, 3.) * .14) * (1. - uSkyNight);
+  col += uSkyGlow * exp(-max(h, 0.) * 7.) * uSkyNight;
+  col = mix(col, vec3(.008, .013, .03) + col * .08, uSkyXray * .92);
+  return col * (1. - uSkyDim);
+}
+vec3 tHorizon(vec3 c, vec3 w){
+  vec3 d = w - cameraPosition;
+  return mix(c, tSky(normalize(d)), smoothstep(uHzNear, uHzFar, length(d)));
+}
+`

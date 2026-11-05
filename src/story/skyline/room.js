@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { buildRoom, ROOM, ROOM_LIGHTS } from './building.js'
 import { CITY_U } from './cityMaterial.js'
 import { FLOOR } from './layout.js'
@@ -16,13 +17,15 @@ export const ROOM_U = {
   uY0: { value: ROOM.yb },
   uH: { value: FLOOR.h },
   uL1: { value: new THREE.Vector3(...ROOM_LIGHTS[0]) },
-  uL2: { value: new THREE.Vector3(...ROOM_LIGHTS[1]) }
+  uL2: { value: new THREE.Vector3(...ROOM_LIGHTS[1]) },
+  // the corner floor lamp beside the sofa (build_room.py 88.2, 46.4; shade centre 1.62 m)
+  uL3: { value: new THREE.Vector3(88.2, ROOM.yb + 1.62, 46.4) }
 }
 
 const ROOM_FRAG_TOP = /* glsl */ `
 varying vec3 vIW; varying vec3 vIWN;
 uniform float uBuild; uniform float uOn; uniform float uDimI; uniform float uY0; uniform float uH;
-uniform vec3 uL1; uniform vec3 uL2;
+uniform vec3 uL1; uniform vec3 uL2; uniform vec3 uL3;
 `
 const BUILD_DISCARD = /* glsl */ `
   float r_h = vIW.y - (uY0 - .4);
@@ -35,8 +38,9 @@ const ROOM_LIGHT = /* glsl */ `
   vec3 n = normalize(vIWN);
   vec3 L1 = uL1 - vIW; float f1 = 1. / (1. + dot(L1, L1) * .07); float d1 = max(dot(n, normalize(L1)), 0.) * .75 + .25;
   vec3 L2 = uL2 - vIW; float f2 = 1. / (1. + dot(L2, L2) * .22); float d2 = max(dot(n, normalize(L2)), 0.) * .75 + .25;
+  vec3 L3 = uL3 - vIW; float f3 = 1. / (1. + dot(L3, L3) * .3); float d3 = max(dot(n, normalize(L3)), 0.) * .75 + .25;
   vec3 warm = vec3(1., .77, .52);
-  totalEmissiveRadiance += diffuseColor.rgb * (warm * (f1 * d1 * 2.9 + f2 * d2 * 1.5) * uOn + vec3(.03, .04, .07));
+  totalEmissiveRadiance += diffuseColor.rgb * (warm * (f1 * d1 * 2.9 + f2 * d2 * 1.5 + f3 * d3 * 1.6) * uOn + vec3(.03, .04, .07));
   totalEmissiveRadiance += vec3(1., .62, .3) * r_edge * 3.;
 }
 `
@@ -112,16 +116,53 @@ export function createTowerRoom() {
     return { solid, glow, curtain, glowMat, outline }
   }, [])
 
+  // Glow materials scale from their base colour with the lights-on fade; the box room has one.
+  let glows = [{ mat: glowMat, base: new THREE.Color(1, 1, 1) }]
+  let source = 'box', disposed = false
   const update = () => {
     ROOM_U.uBuild.value = smooth(S.room, 0, 0.75)
     const on = smooth(S.room, 0.65, 1)
     ROOM_U.uOn.value = on
     ROOM_U.uDimI.value = smooth(S.enter, 0.1, 0.7) * 0.25 + smooth(S.explode, 0.1, 0.6) * 0.5
-    glowMat.color.setScalar(on * (1 - ROOM_U.uDimI.value * 0.7))
+    const k = on * (1 - ROOM_U.uDimI.value * 0.7)
+    for (const g of glows) g.mat.color.copy(g.base).multiplyScalar(k)
     outline.material.opacity = smooth(S.room, 0.05, 0.4) * (1 - smooth(S.follow, 0.15, 0.4)) * 0.9
     group.visible = S.room > 0.001
   };
   group.add(solid,glow,curtain,outline);
-  return {group,update};
+
+  // Modelled room (art/blender/room/build_room.py -> room-v2.glb), authored in the same world frame.
+  // Replaces the box room once loaded; on failure the box room stays.
+  const load = url => new GLTFLoader().loadAsync(url + 'room-v2.glb').then(gltf => {
+    if (disposed) { gltf.scene.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.() }); return }
+    const made = new Map(), nextGlows = []
+    const materialFor = src => {
+      if (made.has(src)) return made.get(src)
+      const name = src.name || 'solid'
+      let m
+      if (/^light_|^fabric_shade/.test(name)) {
+        // emissive fittings: unlit, brightness follows the room's lights-on fade
+        const strength = src.userData?.emissiveStrength ?? src.emissiveIntensity ?? 1
+        m = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, side: THREE.DoubleSide })
+        nextGlows.push({ mat: m, base: src.emissive.clone().multiplyScalar(Math.min(strength, 14) * (name.startsWith('fabric') ? 0.9 : 0.45)) })
+      } else {
+        m = patchRoom(new THREE.MeshStandardMaterial({ color: src.color, roughness: src.roughness, metalness: Math.min(src.metalness, 0.35), side: src.side }))
+      }
+      m.name = name; made.set(src, m); src.dispose(); return m
+    }
+    const meshes = []
+    gltf.scene.traverse(o => { if (o.isMesh) meshes.push(o) })
+    if (!meshes.length) throw new Error('room-v2.glb has no meshes')
+    for (const o of meshes) { o.material = materialFor(o.material); o.castShadow = o.receiveShadow = false }
+    gltf.scene.updateMatrixWorld(true)
+    group.remove(solid, glow, curtain)
+    for (const o of [solid, glow, curtain]) { o.geometry.dispose(); o.material.dispose(); o.dispose() }
+    group.add(gltf.scene)
+    glows = nextGlows
+    source = 'glb'
+    update()
+  }).catch(e => console.warn('Modelled tower room unavailable; keeping the box room', e))
+
+  return { group, update, load, dispose() { disposed = true }, get source() { return source } };
 }
 function buildOnce(fn){return fn();}

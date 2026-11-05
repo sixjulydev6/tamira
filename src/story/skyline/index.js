@@ -5,8 +5,8 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { CITY_U, patchCityMaterial, makeEdgeMaterial, makePointMaterial } from './cityMaterial.js';
-import { extractEdges, samplePoints, textureSampler } from './lidar.js';
-import { SCALE } from './layout.js';
+import { extractEdges, samplePoints } from './lidar.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createGround } from './ground.js';
 import { createFiller } from './filler.js';
 import { ENTER } from './building.js';
@@ -18,7 +18,13 @@ import { S } from './state.js';
 import { local, smooth, lerp } from '../timeline.js';
 import { Wire } from '../wire.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createCableAssembly, CORE_SCALE } from './cable-assembly.js';
+import { DepthBlurPass } from './depth-blur.js';
+
+const SUN_AZ=46*Math.PI/180; // runtime sun azimuth, 0 = +Z, 90 = +X (matches update())
+const HERO_C=new THREE.Vector3(64,100,10); // focal tower centre (layout.js HERO)
+const DAY_ENV_GAIN=1.6; // HDRI sky radiance -> the gradient environment's level
 
 // Vanilla Three.js adaptation of the supplied temira city/room sequence. It uses
 // the existing city renderer and master scroll clock, with no second UI/runtime.
@@ -31,12 +37,13 @@ export function createSkyline(renderer) {
   scene.add(wiring.group, room.group);
   const fog = new THREE.FogExp2('#d3e3f1', .00022); scene.fog = fog;
   const sun = new THREE.DirectionalLight('#fff0da', 4.2);
-  sun.position.set(430, 150, 400); sun.target.position.set(30,0,0);
+  sun.position.set(430, 150, 400); sun.target.position.set(30,0,150); // centred on district + front-left park
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate=false;
   sun.castShadow=true;
   sun.shadow.mapSize.setScalar(matchMedia('(pointer:coarse)').matches?1024:2048);
-  Object.assign(sun.shadow.camera,{near:50,far:1400,left:-260,right:260,top:260,bottom:-260});
+  // light-space bounds of district (x ±250, z -300..300) + park (z 300..760), heights 0..215 m
+  Object.assign(sun.shadow.camera,{near:-60,far:1160,left:-640,right:485,top:345,bottom:-155});
   sun.shadow.bias=-.0003;sun.shadow.normalBias=.8;
   const hemi = new THREE.HemisphereLight('#b8d3ff','#6f6656',.78);
   scene.add(sun, sun.target, hemi);
@@ -47,8 +54,14 @@ export function createSkyline(renderer) {
   }));
   sky.renderOrder=-10; sky.frustumCulled=false; scene.add(sky);
   const ground = createGround(renderer);scene.add(ground.group);
-  const composer=new EffectComposer(renderer);
+  // The scene target carries a depth texture so the distance blur can read it.
+  const sceneTarget=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType});
+  sceneTarget.depthTexture=new THREE.DepthTexture(1,1);
+  const composer=new EffectComposer(renderer,sceneTarget);
+  // clone() shares the depth texture's source; give the second buffer its own to avoid a feedback loop
+  composer.renderTarget2.depthTexture=new THREE.DepthTexture(1,1);
   composer.addPass(new RenderPass(scene,camera));
+  const depthBlur=new DepthBlurPass(camera);composer.addPass(depthBlur);
   const bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.85,.72,.92);
   composer.addPass(bloom);composer.addPass(new OutputPass());
 
@@ -70,25 +83,75 @@ export function createSkyline(renderer) {
   let loaded=false,disposed=false,error=null,elapsed=0,lastP=0,lastBg='#ffffff',entry=null,lastShadowNight=-1;
   const ownedTextures=new Set();
   const url=import.meta.env.BASE_URL+'skyline/';
-  const ready=Promise.all([new GLTFLoader().loadAsync(url+'city.glb'),new THREE.TextureLoader().loadAsync(url+'city-2k.jpg')])
-    .then(([gltf,map])=>{
-      if(disposed){map.dispose();gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});return;}
-      map.flipY=false;map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());ownedTextures.add(map);
-      gltf.scene.updateMatrixWorld(true);let mesh;gltf.scene.traverse(o=>{if(o.isMesh&&!mesh)mesh=o;});
-      if(!mesh)throw new Error('Supplied skyline has no mesh');
-      const geometry=mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);geometry.scale(SCALE,SCALE,SCALE);
-      const sampleTexture=textureSampler(map.image);
-      const cityMesh=new THREE.Mesh(geometry,patchCityMaterial(new THREE.MeshStandardMaterial({map,roughness:.9,metalness:0})));
-      cityMesh.castShadow=cityMesh.receiveShadow=true;scene.add(cityMesh);
-      scene.add(new THREE.LineSegments(extractEdges(geometry,sampleTexture,{angle:32,minLen:.9}),makeEdgeMaterial(900)));
-      const points=new THREE.Points(samplePoints(geometry,sampleTexture,14000),makePointMaterial());points.frustumCulled=false;scene.add(points);
-      gltf.scene.traverse(o=>{o.geometry?.dispose();if(o.material){for(const v of Object.values(o.material))if(v?.isTexture)v.dispose();o.material.dispose();}});
-      scene.add(createFiller(map,matchMedia('(pointer:coarse)').matches?180:360));
+  // Sky reflections for the city only (the cable bridge keeps its own RoomEnvironment).
+  const cityEnvTarget=buildCityEnvironment(renderer),cityEnv=cityEnvTarget.texture;
+  const cityMaterials=[];
+  let entryMeshes=[];
+  const ready=new GLTFLoader().loadAsync(url+'city-v2.glb')
+    .then(gltf=>{
+      if(disposed){gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose?.();});return;}
+      gltf.scene.updateMatrixWorld(true);
+      // Semantic material classes from the Blender kit: '<class>_<variant>' material names.
+      const scanParts=[],made=new Map();
+      const classOf=name=>{const k=name.split('_')[0];
+        return k==='glass'?'glass':k==='leaf'||k==='bark'?'leaf':name==='frame_light'||name==='concrete_light'?'frame':'solid';};
+      const materialFor=src=>{
+        if(made.has(src))return made.get(src);
+        const name=src.name||'solid',cls=classOf(name),glass=cls==='glass',water=name.startsWith('water');
+        const m=new THREE.MeshStandardMaterial({color:src.color,roughness:glass?Math.max(.06,src.roughness):src.roughness,metalness:src.metalness,
+          envMap:cityEnv,envMapIntensity:glass||water?1.15:src.metalness>.5?.8:.32,side:glass?THREE.DoubleSide:THREE.FrontSide});
+        m.name=name;m.userData.env=m.envMapIntensity;patchCityMaterial(m,{cls});cityMaterials.push(m);made.set(src,m);src.dispose();return m;
+      };
+      const meshes=[];gltf.scene.traverse(o=>{if(o.isMesh)meshes.push(o);});
+      if(!meshes.length)throw new Error('Supplied skyline has no mesh');
+      const city=new THREE.Group();city.name='city';
+      for(const o of meshes){
+        const mats=(Array.isArray(o.material)?o.material:[o.material]).map(materialFor);
+        o.material=Array.isArray(o.material)?mats:mats[0];
+        const group=(o.name||'').split('__')[0];
+        if(/lobby_glow/.test(o.name))o.visible=false; // interiors sit behind opaque glass in realtime
+        const tree=o.isInstancedMesh&&mats.some(m=>/^(leaf|bark)_/.test(m.name));
+        o.castShadow=group!=='ground'&&!(o.isInstancedMesh&&!tree);o.receiveShadow=true;
+        if(group==='entry')entryMeshes.push(o);
+        // scan proxy: facade skins, roofs and the hero's terrace slabs give clean silhouettes;
+        // floor bands, fins, mullions, planting, ground and cars stay out of the scan
+        if(!o.isInstancedMesh&&(group==='hero'||group==='city')&&/__(glass_(?!store)|roof_membrane)|^hero__concrete_light/.test(o.name)){
+          const g=o.geometry.clone();g.applyMatrix4(o.matrixWorld);for(const k of Object.keys(g.attributes))if(k!=='position')g.deleteAttribute(k);scanParts.push(g);
+        }
+      }
+      city.add(...gltf.scene.children);scene.add(city);city.updateMatrixWorld(true);
+      const proxy=mergeGeometries(scanParts,false);scanParts.forEach(g=>g.dispose());
+      scene.add(new THREE.LineSegments(extractEdges(proxy,null,{angle:32,minLen:1.6}),makeEdgeMaterial(900)));
+      const points=new THREE.Points(samplePoints(proxy,null,14000),makePointMaterial());points.frustumCulled=false;scene.add(points);
+      proxy.dispose();
+      const filler=createFiller(cityEnv,matchMedia('(pointer:coarse)').matches?180:360);scene.add(filler);
+      filler.traverse(o=>{if(o.isInstancedMesh){o.material.userData.env=o.material.envMapIntensity;cityMaterials.push(o.material);}});
+      loadDayEnvironment();
+      room.load(url).then(()=>{if(!disposed)renderer.compile(scene,camera);}); // modelled room after the city, before the climb reaches it
       renderer.shadowMap.needsUpdate=true;
       loaded=true;update(lastP,lastBg,entry);renderer.compile(scene,camera);
     }).catch(e=>{error=e;console.error('Skyline opening failed',e);});
 
-  function resize(w,h){size.width=w;size.height=h;camera.aspect=bridgeCamera.aspect=w/h;composer.setSize(w,h);}
+  // Day environment: ambientCG DayEnvironmentHDRI114 (CC0), 1K, sun disc clamped so the
+  // directional light stays the only sun. Rotated so the panorama's sun (+X, u = 0.5) sits on
+  // the runtime sun azimuth (46 deg from +Z toward +X). Lighting/reflections only: its lower
+  // half is a rooftop terrace, so the visible sky stays the procedural dome.
+  let dayEnvTarget=null;
+  function loadDayEnvironment(){
+    new RGBELoader().loadAsync(url+'day-env-1k.hdr').then(tex=>{
+      if(disposed){tex.dispose();return;}
+      tex.mapping=THREE.EquirectangularReflectionMapping;
+      const pm=new THREE.PMREMGenerator(renderer);dayEnvTarget=pm.fromEquirectangular(tex);pm.dispose();
+      // three applies the inverse of envMapRotation to the lookup, so yaw by minus the sun's angle
+      const rot=-Math.atan2(Math.cos(SUN_AZ),Math.sin(SUN_AZ));
+      for(const m of cityMaterials){m.envMap=dayEnvTarget.texture;m.envMapRotation.set(0,rot,0);m.userData.env*=DAY_ENV_GAIN;m.needsUpdate=true;}
+      if(new URLSearchParams(location.search).get('env')==='bg'){sky.visible=false;scene.background=tex;scene.backgroundRotation.set(0,rot,0);}
+      else tex.dispose();
+      update(lastP,lastBg,entry);
+    }).catch(e=>console.warn('Day environment unavailable; keeping gradient sky reflections',e));
+  }
+
+  function resize(w,h){size.width=w;size.height=h;camera.aspect=bridgeCamera.aspect=w/h;composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);}
   function update(p,bg,productEntry){
     lastP=p;lastBg=bg;entry=productEntry;
     const rise=local(p,'rise'),scan=local(p,'wireOn'),net=local(p,'extend'),climb=local(p,'run'),follow=local(p,'approach'),bundle=local(p,'bundle'),drain=local(p,'drain');
@@ -106,12 +169,20 @@ export function createSkyline(renderer) {
     CITY_U.uDim.value=Math.max(S.isolate*.55,smooth(.55,1,follow)*.7,S.enter*.92);
     scene.traverse(o=>{if(o.material?.uniforms?.uPR)o.material.uniforms.uPR.value=renderer.getPixelRatio();});
     wiring.update();room.update();ground.update();
+    // depth of field: focus a little past the tower, far city softens; establishing shots only
+    const dU=depthBlur.material.uniforms,dHero=camera.position.distanceTo(HERO_C);
+    dU.uFocus.value=dHero-20;dU.uRange.value=1100;dU.uMaxPx.value=8*renderer.getPixelRatio();
+    dU.uStrength.value=(1-smooth(0,.25,S.xray))*(1-smooth(0,.15,climb));depthBlur.enabled=dU.uStrength.value>.001;
+    for(const o of entryMeshes)o.visible=S.room<.001&&S.climb<.6;
+    const envK=1-.85*smooth(.1,.8,S.night);for(const m of cityMaterials)m.envMapIntensity=m.userData.env*envK;
     const night=S.night*DUSK;
     if(night!==lastShadowNight){renderer.shadowMap.needsUpdate=true;lastShadowNight=night;}
     for(const [a,b] of [['zenith','uZenith'],['mid','uMid'],['horizon','uHorizon'],['sun','uSunCol'],['glow','uGlow']])sample(a,night,skyU[b].value);
     skyU.uNight.value=night;skyU.uXray.value=S.xray;skyU.uTime.value=elapsed;skyU.uDim.value=smooth(.1,.8,S.enter)*.85;
     const elev=THREE.MathUtils.degToRad(lerp(15,-7,smooth(0,.72,night))),az=46*Math.PI/180;
     skyU.uSunDir.value.set(Math.sin(az)*Math.cos(elev),Math.sin(elev),Math.cos(az)*Math.cos(elev));
+    for(const [a,b] of [['uZenith','uSkyZen'],['uMid','uSkyMid'],['uHorizon','uSkyHor'],['uSunCol','uSkySun'],['uGlow','uSkyGlow'],['uSunDir','uSkySunDir']])CITY_U[b].value.copy(skyU[a].value);
+    CITY_U.uSkyNight.value=night;CITY_U.uSkyXray.value=S.xray;CITY_U.uSkyDim.value=skyU.uDim.value;
     sky.position.copy(camera.position);sun.position.copy(skyU.uSunDir.value).multiplyScalar(600).add(sun.target.position);
     sample('sun',night,sun.color);sun.intensity=sample('sunI',night)*(1-S.xray*.8);
     sample('hemiSky',night,hemi.color);sample('hemiGround',night,hemi.groundColor);hemi.intensity=sample('hemiI',night)*(1-S.xray*.55);
@@ -160,9 +231,27 @@ export function createSkyline(renderer) {
   // Shader directives must start on their own line.
   fadeMaterial.fragmentShader=fadeMaterial.fragmentShader.replace(';#include',';\n#include');
   const fadeScene=new THREE.Scene(),fadeCamera=new THREE.Camera();fadeScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),fadeMaterial));
-  function dispose(){disposed=true;const geometries=new Set(),materials=new Set();
+  function dispose(){disposed=true;room.dispose();const geometries=new Set(),materials=new Set();
     for(const root of [scene,bridgeScene,fadeScene])root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)ownedTextures.add(v);}if(o.isInstancedMesh)o.dispose();});
-    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());ownedTextures.forEach(t=>t.dispose());sun.shadow.dispose();environment.dispose();composer.passes.forEach(p=>p.dispose?.());composer.dispose();
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());ownedTextures.forEach(t=>t.dispose());sun.shadow.dispose();environment.dispose();cityEnvTarget.dispose();dayEnvTarget?.dispose();composer.passes.forEach(p=>p.dispose?.());composer.dispose();for(const t of [composer.renderTarget1,composer.renderTarget2])t.depthTexture?.dispose();
   }
-  return {ready,resize,update,render,dispose,bundleAnchors(){return assembly.anchors(bridgeCamera,size.width,size.height);},get loaded(){return loaded;},get error(){return error;},tick(dt){elapsed+=Math.min(dt,.05);update(lastP,lastBg,entry);render();},diagnostics(){return {loaded,error:error?.message,state:{...S},camera:camera.position.toArray(),roomVisible:room.group.visible,assembly:assembly.diagnostics(),redPosition:bridgeWire.group.position.toArray()};}};
+  return {ready,resize,update,render,dispose,bundleAnchors(){return assembly.anchors(bridgeCamera,size.width,size.height);},get loaded(){return loaded;},get error(){return error;},tick(dt){elapsed+=Math.min(dt,.05);update(lastP,lastBg,entry);render();},diagnostics(){return {loaded,error:error?.message,state:{...S},camera:camera.position.toArray(),roomVisible:room.group.visible,roomSource:room.source,entryVisible:entryMeshes.some(o=>o.visible),cityMaterials:cityMaterials.length,dayEnvironment:!!dayEnvTarget,assembly:assembly.diagnostics(),redPosition:bridgeWire.group.position.toArray()};}};
+}
+
+// Daylight sky gradient + sun, prefiltered once. Matches atmosphere.js day keys.
+function buildCityEnvironment(renderer){
+  const s=new THREE.Scene(),geo=new THREE.SphereGeometry(100,48,24),col=[],c=new THREE.Color();
+  const zen=new THREE.Color('#4a8ce2'),mid=new THREE.Color('#7fb3ec'),hor=new THREE.Color('#cfe3f6'),gnd=new THREE.Color('#5d5a52');
+  for(let i=0;i<geo.attributes.position.count;i++){
+    const y=geo.attributes.position.getY(i)/100;
+    if(y<0)c.copy(hor).lerp(gnd,Math.min(1,-y*4));else if(y<.25)c.copy(hor).lerp(mid,y/.25);else c.copy(mid).lerp(zen,(y-.25)/.75);
+    col.push(c.r,c.g,c.b);
+  }
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  s.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+  const el=15*Math.PI/180,az=46*Math.PI/180,sunDisc=new THREE.Mesh(new THREE.SphereGeometry(5,16,8),new THREE.MeshBasicMaterial({color:new THREE.Color(14,12.5,10.5)}));
+  sunDisc.position.set(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)).multiplyScalar(90);s.add(sunDisc);
+  const pm=new THREE.PMREMGenerator(renderer),rt=pm.fromScene(s,0);pm.dispose();
+  s.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
+  return rt;
 }

@@ -1,220 +1,288 @@
-> Historical clay-art production brief, preserved for material references and reproducible offline work. Current runtime direction supersedes its raster-first delivery plan: the city, rise and traffic are procedural Three.js driven by GSAP; opening imagery is fallback only. The accepted ending reuses the original rendered room, with the same single red wire connecting at the rear board and the original three-wire camera/red insertion timing. Do not rebuild the whole site from this older plan. Use Comet for browser review. Read [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md) before implementation; post-fix board visual verification remains open.
+# Tamira skyline hero — architectural quality and continuity brief
 
-# Tamira city hero — production prompt and implementation plan
+Prepared 2026-11-05. **Planning artifact only. No website implementation is authorized by this document alone.** The current request is research and a detailed production prompt. Future execution requires a separate implementation request. The previous clay brief is preserved at [docs/archive/prompt-clay-hero-2026-11-05.md](docs/archive/prompt-clay-hero-2026-11-05.md); its aesthetic and raster-first recommendation do not govern this brief.
 
-## Task and scope
+## 1. Production prompt
 
-Rebuild the material, lighting and finish of Tamira’s existing city hero to match the supplied clay/ceramic references. Preserve the first screenshot’s city identity and its relationship to the website. Deliver an editable Blender source scene, a reproducible build/render script, finished responsive hero images, and a verified integration with the existing Three.js scroll story. This document is the implementation brief; writing it does not mean those assets have already been produced.
+Improve Tamira's existing city landscape to the standard of a carefully art-directed architectural visualization. Build a believable contemporary district around the existing planted terrace tower: clear structural rhythm, recessed glazing, credible facade thickness, deliberate setbacks, natural planting, grounded streets and controlled daylight. The city must feel inhabited and engineered, not like identical textured boxes or melted generated geometry.
 
-Do not redesign the whole website, replace the stack, or replace the orange crown tower with one of the reference buildings. The other supplied images establish finish and lighting quality, not a new architectural brief.
+The argument is specific to Tamira: **the visible city depends on wiring people never see.** Establish a convincing inhabited district, move from daylight into dusk, reveal its hidden electrical network, follow one feeder into a furnished room, then reveal the three-core cable and physically extract the red core into the existing product story. Visual credibility must survive the moving camera, architectural scan and close approach, not just a single opening screenshot.
 
-## Reference reading
+Use Terminal Industries as a benchmark for subject continuity, grounded lighting, surface separation and the transition from a solid subject to a technical representation. Use the user's architectural and industrial images for construction detail and material finish. Keep Tamira's existing typography, layouts and narrative. Do not import another site's visual identity.
 
-Treat the supplied images in this order:
+### Non-negotiable boundaries
 
-- **Image 1: composition and identity.** White city, dominant orange crown tower, elevated oblique view, quiet white website, black headline toward the lower left. The crown silhouette and window rhythm are essential. The broad white fade in the screenshot is page presentation, not evidence that the underlying materials should look washed out.
-- **Image 2: dense city material and light.** Orange tower against neutral buildings, clear distinction between illuminated and shaded faces, grounded streets, warm light accents, selective depth of field. Preserve the density without reproducing blur across the main subject.
-- **Image 3: edge and highlight quality.** Rounded building corners catch continuous highlights; orange painted surfaces have a broad satin response; shadows have direction and a readable penumbra. The train and elevated track illustrate material contrast; they are not required objects for Tamira.
-- **Image 4: close material benchmark.** Orange bands have real thickness and rounded edges. Windows sit slightly below or above the facade rather than appearing as flat printed squares. Neutral buildings retain white highlights and cool grey shadow faces. Contact shadows make the floating emblem and building bases legible.
+- Preserve Geist Serif headings, Instrument Sans body copy, logo, navigation, rounded frame, copy, CTA placement and all existing responsive layouts.
+- Preserve the latest smaller hero title: `clamp(2.5rem, 1.52rem + 3.36vw, 5.6rem)`; do not undo the 20% reduction.
+- Preserve the city → dusk → scan → underground network → tower riser → room → ceiling cable → red/blue/green bundle → physical red extraction → existing product chapters.
+- Preserve chapter order, timing, reverse seeking, reduced-motion behavior and fallback handling. A visual-quality task is not permission to lengthen the story.
+- Preserve all product-wire materials, copper/strands/flex/heat/flame/smoke chapters, switchboard insertion and final living room. The previously rejected red cable material must not return.
+- Keep vanilla JavaScript, Vite 5.4.10, Three.js 0.170.0, GSAP 3.12.5 and the existing two WebGL contexts. No React conversion or new animation framework.
+- Do not copy Terminal's truck, assets, lime palette, navigation, copy or font. Do not copy the reference architecture literally.
+- No scene creation, render job, model import, material assignment or website code changes as part of this planning delivery.
 
-These are visual observations, not measured shader values. The images cannot reveal exact roughness, light power, camera optics or rendering engine. All numerical settings below are starting points to tune against rendered comparisons.
+## 2. Evidence and what it establishes
 
-### What creates the quality
+### Terminal Industries: observed behavior
 
-The target is an architectural miniature made from satin ceramic, dense resin or carefully coated clay. It is not chalk, unfinished concrete, gummy wax, polished plastic or wet porcelain.
+Reference: [terminal-industries.com](https://terminal-industries.com/), inspected in an isolated muted Comet session. Captures are review references, not licensed production assets.
 
-The quality comes from five cooperating systems: bevel geometry, smooth but controlled normals, moderately rough dielectric materials, directional studio lighting with restrained fill, and a color pipeline that protects highlights without flattening shadows. Fine texture is subordinate. HDR lighting means a useful range of scene luminance, not a bloom filter or an HDR display requirement.
+![Terminal opening: truck silhouette and directional lighting](docs/references/skyline-upgrade/terminal-00.jpg)
 
-### Current asset assessment
+![Terminal wider yard and partial technical scan](docs/references/skyline-upgrade/terminal-01.jpg)
 
-`public/media/hero-day.jpg` was inspected directly. It already carries the correct crown, city density and orange/white hierarchy. Its broad softness, pale face separation and limited edge highlights make it less tactile than the closer reference views. The first experiment should change bevels, lighting and focus while keeping layout fixed; adding more buildings is not the first fix.
+![Terminal technical-space continuation](docs/references/skyline-upgrade/terminal-02.jpg)
 
-## Architecture decision
+The captured progression starts with a readable side-on truck against a warm sky. A wider elevated yard view supplies buildings, containers, paving and shadows; scan lines and points overlap the truck before the sequence moves into a dark technical space. The environment is part of the explanation rather than an unrelated decorative background. Trailer panels, cab, tires and ground have different light responses. Contact shadows and directional reflections establish weight. The scan keeps enough recognizable silhouette to link the technical view to the physical subject.
 
-Blender, GLB and Three.js are different layers, not interchangeable choices.
+These captures were made at 1440×900 after loading, then at successive 650px wheel increments. They are sampled states, not an exhaustive frame-by-frame measurement or proof of physical-device performance. Captures 03–05 are retained alongside them for sequence context. The screenshots also reflect the site's current load/animation state; they do not establish intended text timing.
 
-| Approach | Quality and cost | Decision |
+### Terminal: shipped-code findings, distinct from visual inference
+
+Public homepage HTML and its linked chunks were downloaded as inert text. REA analyzed the entry bundle, then a focused selection of `DXfGmXPJ.js`, `v4SaURl9.js` and `B8tolC06.js`. The focused analysis parsed three files, 11,134 text bytes, with no parse failures. Coverage remains partial: 50 inventoried files were outside that selection, with dynamic relationships unresolved. Evidence summary: [rea-evidence.json](docs/references/skyline-upgrade/rea-evidence.json).
+
+Manual inspection of those same shipped chunks establishes:
+
+- `VideoSequenceScroll` maps ScrollTrigger progress to a frame-sequence component.
+- Desktop configuration uses `/static/frames/home/desktop/webp/hero_anim_desktop_60_{index}.webp`, count **410**.
+- Mobile configuration uses `/static/frames/home/mobile/webp/hero_anim_mobile_60_{index}.webp`, count **409**.
+- Sequence rendering creates a `canvas`, requests a **2D** context, and uses `drawImage` with fitted cover positioning.
+- A `video-sequence.worker-B5BJOqje.js` worker receives frame requests; cleanup terminates it and clears image sources.
+
+Public code links: [hero sequence](https://terminal-industries.com/_nuxt/DXfGmXPJ.js), [frame renderer](https://terminal-industries.com/_nuxt/v4SaURl9.js). Chunk URLs may change after deployment. REA parent evidence: `ev_82b167973c602cd98ddf0032131640605c65982d1a49a2249fed59c99aa349ec`.
+
+**Conclusion:** the inspected homepage hero is a prerendered image sequence displayed on a 2D canvas. A canvas does not prove live WebGL. Its finish is not evidence that the same quality is cheap to produce with an arbitrary realtime model. The source DCC, render engine, topology, exact materials, lighting values and full production process are unknown. Do not invent them. Other videos elsewhere on the page do not identify the hero delivery mechanism.
+
+### Current Tamira: verified source facts
+
+![Current shipped skyline poster — baseline, not target](docs/references/skyline-upgrade/current-skyline.jpg)
+
+This is the current asset's existing fallback poster, not a newly captured screenshot and not proof of the latest title size.
+
+- `public/skyline/city.glb`: 459,884 bytes; generator metadata `Tripo`; **one mesh, one primitive, one material**, 11,233 vertex entries and 24,735 indices, or **8,245 triangles** in triangle mode.
+- Runtime uses `city-2k.jpg` with a shared `MeshStandardMaterial`, roughness **0.9**, metalness **0**. That cannot independently describe polished glazing, stone, aluminum and foliage.
+- `index.js` takes the first mesh, clones its geometry and applies the common material. It then disposes the imported scene. A future multi-mesh/multi-material GLB will lose its intended structure unless this loader is deliberately updated.
+- `filler.js` creates instanced boxes; `cityMaterial.js` samples arbitrary atlas patches for their facade UVs. Runtime requests 360 base filler instances on desktop and 180 on coarse pointers; the generator also budgets an additional 55% low-rise instances, subject to placement limits.
+- Night glazing/foliage identification is inferred from texture RGB. It is not semantic material segmentation.
+- LiDAR points and edges derive from the same geometry and texture classification. Changing geometry without adapting this path can produce a noisy or broken technical reveal.
+- Current city lighting uses a directional light, hemisphere fill, static shadow updates, procedural sky/fog and bloom. The PMREM room environment in the file belongs to the cable bridge; do not assume it already supplies architectural city reflections.
+
+### Diagnosis
+
+The low triangle count is a constraint, but adding subdivisions will not reconstruct window recesses, restore malformed terrace shapes, separate physical materials or correct random atlas sampling. The visible problems are a combination of weak source architecture, insufficient material segmentation, repeated filler forms, planting silhouettes, ground design, reflection/lighting and atmospheric presentation. Diagnose normals and UV distortion directly during production; those defects are plausible risks, not facts proven by a screenshot.
+
+## 3. User reference images: interpretation and availability
+
+The six supplied images were visually reviewed in the conversation. Their original attachment bytes are not exposed as local project files in this session. They are **not falsely represented by the Terminal captures or the existing skyline poster**. This document records their roles below; a portable handoff still needs the six original files saved beside this document. Do not use broken Markdown image links or substitute generated approximations.
+
+| ID | Supplied image | Apply | Do not inherit |
+| --- | --- | --- | --- |
+| U1 | Current Tamira hero, blue skyline, planted tower on right | Current identity, composition and failure baseline | Repeated flat boxes, vague terrain, atlas smears or broad haze as a quality target |
+| U2 | 53WEST53, upward view of diagonally braced tower | Sharp structural logic, glass/frame separation, sunlight/shadow hierarchy, architectural authority | Its camera angle across our full story, typography, navigation or exact tower design |
+| U3 | “Bring your real estate vision to life”, terrace tower and skyline | Credible facade rhythm, planted setbacks, dominant tower within a believable city | Mixed headline fonts, overlapping UI, copied layout or exact building |
+| U4 | CGSTANDARD.COM industrial isometric machinery | Small bevels, restrained PBR, clean assembly detail, scale, coherent soft contact shadows | Factory scene, orange accents as a new palette, people/machines as required props; retain watermark on reference |
+| U5 | Night apartment tower on square diorama base | Window depth, balconies, roof equipment, lit-room variation, paving/planting/contact detail | Black void, square floating base or a permanently nocturnal hero |
+| U6 | Warm-toned architectural scale model on a desk, with a digital building model on the monitor behind it | Layered floor bands, dense vertical facade fins, recessed dark glazing, stepped planted roof terraces, credible edge thickness and grounded assembly | Desk/monitor scene, display plinth, photographic shallow focus, exact building design or an automatic orange/copper recoloring of the entire city |
+
+For the portable package, use `user-01-current-hero`, `user-02-53west53`, `user-03-terrace-tower`, `user-04-industrial-finish`, `user-05-night-apartment`, `user-06-finned-terrace-model`, retaining originals and source attribution. Record actual extensions and dimensions in a manifest when originals become available. Reference images do not grant permission to redistribute their depicted assets or use them on the website.
+
+### U6 — architectural model finish and facade construction
+
+The additional reference shows a physical-looking architectural model in the foreground and a digital model on a monitor behind it. Treat the foreground building as the construction/finish benchmark: closely spaced warm vertical fins wrap layered, offset floor bands; deep shadow gaps separate those bands; glazing is recessed beneath them; planted roof areas sit inside substantial parapets. The contrast between light podium, dark glazing, warm fins and greenery makes each assembly readable. The image does not establish the actual fin material, manufacturing method or renderer: wood, terracotta, coated metal and copper are distinct material choices and must not be conflated from color alone.
+
+Apply this reference to a representative tower corner during the material-slice gate. Model fins and slab edges where they affect the silhouette, parallax or visible shadows; use simplified modules or baked normal/detail maps farther away. Keep fin spacing architecturally consistent and test for moiré/shimmer during camera motion and at phone resolution. Preserve terrace planting and visible facade depth without copying the complete building or adopting the desk photography as the hero composition. Warm accents may be explored in the material study, but the existing Tamira tower identity and page palette remain the constraints. Do not infer that this reference requires a timber-clad city or a clay aesthetic.
+
+## 4. Art direction and architectural specification
+
+### Subject and hierarchy
+
+Tamira's relevant ingredients are copper house wiring, hidden building services, ordinary inhabited rooms, the planted tower, urban density, the substation, an underground feeder, the ceiling run, the white cable sheath, three colored cores and the red core becoming the product subject. Every added detail should support scale, inhabitation or this route.
+
+The first view needs one unmistakable focal tower on the right, an irregular supporting skyline below it, calm sky behind the existing upper-left headline and readable ground behind the lower-left sentence. Preserve the current composition before exploring refinements inside the canvas. Do not move HTML to accommodate an overcrowded model.
+
+### Geometry
+
+1. Rebuild the focal tower as intentional modular architecture. Preserve its recognizable planted terrace/setback identity and overall screen-space placement. Author floor slabs, vertical framing, recessed glazing, parapets, terrace planters, a coherent podium, service roof and entrance. Verify that structural members meet instead of intersecting arbitrarily.
+2. Use real facade depth on the focal tower and any surface approached by the camera. Use restrained bevels at visible slab/frame edges; tune to projected pixel size. Sub-pixel distant bevel geometry is wasted.
+3. Create 6–10 supporting building families with different footprints, floor rhythms, rooflines and setbacks. Use instances with bounded variation; organize streets and blocks. Avoid random height/texture noise and identical spacing.
+4. Treat near, middle and far city separately. Near geometry needs silhouette, bases and readable details; middle distance needs facade rhythm; far distance can use simplified masses and baked detail. Use atmospheric depth to separate real layers, not hide errors.
+5. Replace chunky green blobs with limited species of believable shrubs/small trees. Match planter depth and root placement. Favor stable silhouettes and restrained leaf noise over dense alpha-card overdraw.
+6. Build credible curbs, sidewalks, road junctions, planted strips and tower-ground contact. Use a few scale cues visible on the actual route. No floating bases, road-through-building intersections or unused high-detail machinery.
+7. The room entry and wire path must be designed into the tower. Do not finish a facade and then push the camera through an accidental wall.
+
+### Finish
+
+Aim for clean, contemporary architectural realism with selective detail. Concrete/stone is warm neutral; glass reflects a cooler sky without turning the entire city saturated blue; bare metal catches narrow highlights; coated frames are quieter; planting has controlled value variation. Keep wear subtle and localized. The industrial reference demonstrates finish discipline, not a requirement for toy-like plastic.
+
+Reject melted/smeared windows, mismatched facade scale, painted-on terraces, unrelated facade patches, mirror-blue slabs, glossy roads, luminous opaque walls, deep black unfilled day shadows and global bloom masking detail.
+
+## 5. Material schedule and source catalog
+
+Values below are **proposed starting ranges**, not measured reference settings. Tune them under the chosen lighting in Blender and again in the pinned Three.js runtime. Author editable Principled BSDF materials; bake unsupported procedural detail. Inspect local node sockets by type and available API, not localized node names or copied Blender-version assumptions.
+
+| Material | Metallic / roughness starting point | Construction and runtime treatment |
 | --- | --- | --- |
-| Blender source + Cycles render served as an image | Highest control over soft light, bounce, contact and focus; low runtime cost; fixed view | Primary opening hero |
-| Blender-authored optimized GLB + Three.js lighting | Supports camera movement and live relighting; requires a separate runtime look-development pass | Use where the existing story needs solid geometry or camera motion |
-| Entire city procedurally authored in Three.js | Technically capable, but requires equivalent geometry, lighting and art direction work in code | Keep for existing wireframe/extension; do not rebuild the hero this way by default |
-| Prerendered full animation | Consistent offline lighting but heavier delivery and poor arbitrary scroll seeking | Do not introduce unless an approved camera sequence requires it |
+| Architectural concrete/stone | 0 / 0.65–0.85 | Neutral base, subtle micro-normal and restrained roughness variation; modeled joints/recesses on hero surfaces; avoid photographic baked shadows |
+| Coated window frames | 0 / 0.3–0.5 | Painted metal behaves as a dielectric coating at its visible surface; model highlight-bearing edges |
+| Exposed aluminum | 1 / 0.25–0.45 | Separate from coated frames; restrained brushing, coherent orientation |
+| Architectural glass | 0 / 0.08–0.22, IOR around 1.5 | Reflection-driven panes, slight tint and interior depth; prioritize opaque reflection/interior proxies in realtime over hundreds of expensive transmission layers |
+| Roof membrane | 0 / 0.75–0.95 | Dark neutral, parapets, drains and sparse service equipment; no flat pure-black lid |
+| Asphalt | 0 / 0.8–0.95 | Correct aggregate scale, subtle seams and restrained normal; no wet mirror finish unless explicitly requested |
+| Paving | 0 / 0.65–0.85 | Modular joints at plausible scale; localized dirt/AO, not dark outlines around everything |
+| Planting | 0 / 0.55–0.85 | A few coherent greens, modest saturation, stable normals and correct contact; test alpha cost |
+| Night interiors | emissive mask, separate geometry/material | Deterministic room clusters with plausible warm/cool variation; not one random blinking value per pixel |
 
-**Recommended pipeline:** editable `.blend` + deterministic scene data → Cycles hero stills and matching transition metadata → optional runtime GLB → existing Three.js/GSAP story.
+Do not force every metallic pixel to a binary value when filtering a packed map, but author each actual exposed metal/dielectric surface according to what it is. Glass is not metal.
 
-A `.blend` is the source of truth for look development. It is not a browser asset. A `.glb` transports geometry and supported PBR materials; it does not reproduce a Cycles render automatically. Blender area/world lighting is not carried by the standard exporter as the complete studio setup. Procedural shading must be translated or baked where needed. Rebuild runtime illumination explicitly.
+### Verified source options, not imported assets
 
-Do not promise identical realtime and offline results. If the hero is static, use the render. If an interactive solid city is later required, validate one building and the crown in Three.js before exporting the whole city.
+Official pages were checked during research. Only preview PNGs were saved; **full PBR texture packs and HDRIs have not been acquired or assigned**.
 
-## Existing project constraints
-
-Read `docs/ARCHITECTURE.md`, `docs/STORY.md`, `docs/DESIGN-SYSTEM.md`, `docs/REFERENCES-AND-ASSETS.md` and `docs/OPEN-ITEMS.md` before implementation.
-
-Verified repository structure:
-
-- Vite 5.4.10, vanilla JavaScript, Three.js 0.170.0 and GSAP 3.12.5. Keep these unless a specific incompatibility requires a change.
-- `src/main.js` drives scroll, poster/canvas blending and fallback behavior.
-- `src/story/city.js` holds the city layout, crown, roads and the avenue. Its world convention is Z up, in metres.
-- `src/story/scene.js` holds camera poses, two renderers and city-to-product handover.
-- `src/story/timeline.js` defines story segments. Preserve chapter order and progress semantics.
-- `src/story/palette.js` and `src/style.css` control page color and framing.
-- The opening image is aligned to the procedural city. Existing docs describe a 38° elevation, −45° azimuth and 400 m horizontal frame width.
-- Current city shaders are intentionally unlit. Changing their roughness cannot create a clay daylight renderer.
-- Existing docs describe an external `hero_day.py` Blender source. The documented local path was not present when this brief was written. Locate it if available; otherwise reconstruct from the in-repo deterministic geometry. Do not assume source access.
-
-Do not edit someone else’s live Blender scene. If using the shared render machine described in the repository docs, use a separate background process and its designated Tamira output directory.
-
-## Art direction using design-taste-frontend
-
-This is a single hero asset within an existing direction, so use the skill’s single-section exception: preserve surrounding type, palette and composition rather than drawing a new page direction. No random direction or seed was generated for this planning task.
-
-Subject inventory, grounded in the supplied visuals and repository: Tamira wordmark; orange six-arm crown; central tower’s recessed opening; white windowed blocks; charcoal roof planes; compact city streets; miniature trees; the clear avenue; cable replacing the reference train’s movement; daylight-to-wireframe reveal. These are available motifs, not claims of unique real-world brand ownership.
-
-**Idea:** On this page, Tamira’s crown-shaped tower becomes the focal point of a miniature city whose hidden wiring is revealed by scroll.
-
-**Argument:** the opening establishes the city and crown; the aligned wireframe reveals structure; the avenue and cable connect the city to the existing product story. Preserve that visual continuity instead of inserting a disconnected decorative model.
-
-**One live thing:** retain the existing scroll-controlled reveal and cable journey. Do not add orbit controls, a second interaction or an unrelated material selector.
-
-Keep a flat white page, black text and existing red brand accent. The orange physical material belongs to the scene. The skill’s bans on UI shadows, gradients and glows must not remove physically necessary shadows or shading from this 3D artwork; the user explicitly requires them. Avoid fake CSS shadows behind the hero, glass panels, new badges and decorative labels. Do not add extra images or entrance animations just to satisfy full-page counts in a single-asset task.
-
-## Production sequence
-
-### Establish a reproducible baseline
-
-1. Record repository status and preserve unrelated changes.
-2. Run the existing site and capture 1440×900, 768×1024 and 390×844 views, including `?at=day:0.5`, `?at=wireOn:0.4` and `?at=wireOn:0.95` in development.
-3. Capture the raw existing image alongside the composed hero. Separate lighting problems from CSS masking problems.
-4. Locate Blender source and reference files. Record Blender version, renderer, color settings, seeds and output paths. If the supplied chat references are unavailable as local files, preserve this written analysis and request the originals only when actual image comparison requires them.
-5. Export or reconstruct a shared city manifest containing stable building IDs, transforms, dimensions, crown outline, road paths, camera and anchors. Do not maintain independently hand-tuned city layouts.
-
-### Lock geometry and composition
-
-Start with the current layout and camera. The hero tower remains tallest and visually dominant; foreground buildings must not hide its recognizable upper silhouette. Keep windows regular and subordinate. Keep the avenue clear for the cable sequence.
-
-Model the crown as the existing six-arm notched extrusion around a central opening. Do not substitute a generic cylinder, star or flower. Use physically thick surfaces and resolve overlaps at arm junctions. Bevel edges without rounding away its identity.
-
-Suggested bevel starts, relative to each building’s width:
-
-- Main facade edges: 0.4–1.0% of width, 3–5 segments.
-- Crown: 0.2–0.5% of crown diameter; inspect the notches and opening at final size.
-- Window edges: narrow bevel only, with shallow recess or restrained raised insets.
-- Roof slabs: real thickness and a narrow rounded edge.
-
-Apply scale before beveling. Keep broad facade faces planar; use controlled smooth shading and weighted/custom normals where supported. Avoid inflated corners, shading dents and excessive subdivision. Inspect silhouette and normals before texturing.
-
-For medium and far windows use instancing, atlas relief or normal maps. Do not create thousands of independent window materials. Keep trees as simple rounded miniature forms and vehicles subordinate. Do not add a train, repeated floating emblems or orange bands simply because they occur in the quality references.
-
-### Material look development
-
-Build a test scene with one white block, one orange block, a charcoal roof and the actual crown detail. Approve their finish before rendering the full city.
-
-| Material | Suggested starting values | Desired reading |
+| Candidate | Intended role | Decision |
 | --- | --- | --- |
-| Neutral city | Base color around `#E5E5E1`, metallic 0, roughness 0.40–0.55, IOR about 1.45–1.50 | White satin ceramic with broad highlights |
-| Crown orange | Start around `#E85C2D`, metallic 0, roughness 0.32–0.45, IOR about 1.46 | Saturated coated clay, orange in light and shadow |
-| Ground | Near-neutral `#E8E9E7`, metallic 0, roughness 0.65–0.80 | Quiet matte support with visible contact |
-| Roofs/windows | Neutral charcoal/grey, metallic 0, roughness 0.35–0.55 | Restrained contrast, no black voids |
-| Trees | Same neutral material family, roughness 0.50–0.65 | Rounded miniature forms, not foliage realism |
+| [Poly Haven Concrete Wall 006](https://polyhaven.com/a/concrete_wall_006) | Concrete microstructure reference / secondary service surfaces | Its weathered, chipped finish is too rough for the primary clean facade unchanged; build a cleaner hero material or select a closer swatch before acquisition |
+| [Poly Haven Asphalt 02](https://polyhaven.com/a/asphalt_02) | Road material candidate | Test aggregate at street scale; reduce cracking/wear if it competes with the tower |
+| [Kloofendal 48d Partly Cloudy Pure Sky](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Daylight reflection and lighting test environment | Align visible sky, sun and reflections; avoid two conflicting suns |
+| [ambientCG](https://ambientcg.com/) | Alternate clean concrete/paving library | Search and choose exact asset IDs at swatch review; no specific unverified ID is approved here |
+| Custom authored glass, frames and interior masks | Main tower surfaces | Preferred over applying a generic facade photograph to a box |
 
-These hex colors are display-space swatches, not measured physical reflectances. Judge them under the approved exposure. Do not force a lit white surface to equal the input swatch.
+![Concrete candidate preview](docs/references/skyline-upgrade/material-concrete.png)
 
-Keep coat at zero initially; test a small amount only if bevel highlights remain too dull after lighting is correct. Leave transmission and subsurface off initially. Clay style does not require translucency. Use subtle roughness variation of roughly ±0.02–0.04 and very low normal relief only if visible in the close reference comparison. At hero scale the surfaces should read almost smooth. No grunge, pores, fingerprints, heavy concrete noise or metallic orange.
+![Asphalt candidate preview](docs/references/skyline-upgrade/material-asphalt.png)
 
-### Lighting
+![Daylight HDRI candidate preview](docs/references/skyline-upgrade/material-sky.png)
 
-Use Cycles for the approved still.
+[Poly Haven's asset license](https://polyhaven.com/license) and [ambientCG's license](https://docs.ambientcg.com/license/) identify their assets as CC0. Keep an asset manifest with exact page URL, downloaded file URL, asset ID, author if listed, license, acquisition date, resolution, map conventions, physical tile size and local checksum. These license statements do not apply to Terminal's imagery or the user's third-party screenshots.
 
-- Place a dominant area key above and to camera-left. Rotate it until the scene’s cast shadows agree with the reference direction rather than applying the same arbitrary world rotation to every setup.
-- Start with the key’s apparent size around half to one tower width from the subject’s perspective. Adjust source size/distance to create coherent broad-edged shadows, not ambient mush.
-- Use a weak neutral/cool world or large fill, initially about 20–35% of the key’s contribution at the subject. This is a visual ratio, not a universal watt setting.
-- Add a restrained large rim only if it improves edge separation without creating a second competing shadow direction.
-- Use bounce lighting for local orange spill. Do not add an orange emissive fog layer around every building.
-- Keep the white city bright while retaining readable shaded faces and tight base contact. Contact shadows should be darkest at contact and soften away.
+Use base color/emissive in sRGB; normal, roughness, AO and metallic maps as data. Verify OpenGL normal orientation. Pack glTF ORM correctly: occlusion R, roughness G, metallic B, with the required UV channel configuration. Avoid baking daylight highlights into base color that must relight at dusk. Bake procedural shader detail when needed; Cycles-only node graphs and volume shading are not automatic web equivalents.
 
-Debug with clay override and no bloom. If the result is flat, reduce fill before lowering roughness. If it looks plastic, increase roughness or broaden the reflection source before adding texture. If corners remain invisible, inspect bevel geometry and normals.
+## 6. Lighting, color and camera
 
-### Camera, focus and image finish
+- Establish a single coherent daylight direction with readable warm-neutral illuminated faces, cooler but detailed shade, sky reflection and stable contact shadows. Start look development without bloom or fog so errors remain visible.
+- Add reflected sky/environment support to the city deliberately; match the sun direction to the environment. Keep city and cable environment ownership separate.
+- Use subtle distance haze after geometry and lighting pass. Preserve existing HTML haze/layout in this scope; judge the 3D city with it both visible and temporarily disabled in a development comparison, without shipping unrelated CSS changes.
+- Dusk should shift sky and illumination coherently, with window/interior activation and restrained practical lights. Do not fake every reflection with emission or make stone glow.
+- Protect highlights and midtone separation. Record exposure, view transform and environment rotation. Blender AgX and Three.js ACES/Neutral are different transforms: compare outputs instead of expecting numeric parity.
+- Preserve existing camera poses first. Tune perspective only if the hero tower's framing and room approach can remain continuous across desktop and portrait. Do not impose the 53WEST53 low angle on every beat.
+- Check the whole camera corridor: wide skyline, dusk, scan, underground network, riser, room threshold and ceiling follow. Avoid clipping, camera-wall intersections, excessive near/far depth range and sudden lens changes.
+- Portrait needs deliberate composition within the current layout, not a center crop of a desktop still that loses the tower or feeder.
 
-Use orthographic projection for the locked opening composition. Treat the documented 400 m as horizontal world coverage; Blender orthographic scale and Three.js frustum must be derived from aspect ratio and checked by projection, not equated blindly.
+## 7. Delivery architecture decision
 
-Set focus so crown top, primary orange facade and nearby buildings remain readable together. Initially disable depth of field; introduce only enough to soften distant edges after materials are approved. Do not blur away the bevels that establish quality. Orthographic focus behavior must be tested in the installed Blender version; do not assign an f-stop without checking its result.
+| Option | Advantage | Constraint | Recommendation |
+| --- | --- | --- | --- |
+| Blender-authored modular GLB + existing Three.js story | Preserves live scan, route, camera, responsive seeking and cable continuity | Requires runtime material/lighting optimization; cannot assume Cycles parity | **Default for this project** |
+| Prerendered opening frames + calibrated realtime handover | Closest route to offline-rendered finish | New frame delivery, decoding/memory, portrait sequence and exact handover burdens | Escalation option only if a representative realtime slice fails the quality/performance gate |
+| More subdivisions / larger atlas on current merged city | Small integration effort | Does not repair architecture or material semantics | Insufficient as the primary solution |
 
-Render at 2560×1440 or larger for desktop master, with separate portrait framing for mobile. Use 256–512 samples as an initial final-render range, adaptive sampling and denoising; increase only if visible noise remains. Preserve a linear EXR master and a display-referred PNG master. Record the exact view transform and exposure; choose AgX or the installed equivalent deliberately. Avoid crushed blacks, clipped white facades, excessive contrast and indiscriminate sharpening.
+Do not switch to Terminal's frame architecture merely because Terminal uses it. If a hybrid becomes necessary, first present the quality/performance comparison and precise handover frames for review. It must not introduce a visible match cut in the cable extraction or replace downstream product chapters. Offline renders remain useful as a look target and fallback posters regardless of final runtime choice.
 
-Deliver an unmasked beauty render. Evaluate the existing CSS fade separately. Limit fading to the copy-side/perimeter needed for integration; never wash out the crown’s key face to hide a compositing mismatch.
+## 8. Integration contracts future implementation must respect
 
-## GLB and realtime branch
+Read [docs/SKYLINE-HERO.md](docs/SKYLINE-HERO.md), [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md), [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md), the active source and `git status` first. Some historical prose, including branch/delivery statements in current-context documentation, is stale; current Git and active imports establish runtime facts. This brief was prepared on `bishwa-wire-v2`, with existing uncommitted title/CSS documentation changes to preserve.
 
-Only build this branch for actual runtime geometry requirements. The recommended static hero does not depend on loading a GLB.
+| File | Required future treatment |
+| --- | --- |
+| `src/story/skyline/index.js` | Traverse intended meshes/materials, retain material semantics, build city environment, preserve loading/fallback/lifecycle; do not keep the first-mesh-only assumption |
+| `layout.js` | Single source for footprints, hero/cut bounds, floors, riser, substation, feeder and entry; migrate all dependent anchors together |
+| `cityMaterial.js` | Preserve scan uniforms while supporting material classes and explicit masks; replace RGB guesses for window/foliage identity |
+| `filler.js` | Replace random atlas patches with a coherent modular kit and shared/instanced geometry |
+| `lidar.js` | Build clean architectural scan proxies; exclude foliage and micro-bevel noise semantically rather than by RGB alone |
+| `ground.js`, `atmosphere.js` | Coordinate street layout, light/sky/fog and network visibility |
+| `rig.js`, `building.js`, `room.js`, `wiring.js` | Keep room/world alignment and smooth feeder-to-ceiling continuity |
+| `cable-assembly.js`, `scene.js`, `timeline.js` | Protect current core extraction and product handover; avoid unrelated edits |
 
-- Export applied bevel geometry, correct normals, supported PBR materials and named anchors. Convert procedural noise to textures where needed. Keep reusable building modules instanceable.
-- Handle Blender Z-up to glTF Y-up explicitly. Either adapt the imported root once to the existing Z-up story or migrate every dependent camera/path together. Do not double-convert axes.
-- Keep animated cable and lit windows separate from static baked content. Never bake a temporary light state into a surface expected to switch state later.
-- Choose one lighting strategy per material: live PBR plus AO/indirect support, or fully baked unlit appearance for fixed illumination. Do not bake direct shadows into base color and add the same direct light again.
-- A full lightmap may need explicit Three.js UV/material wiring; verify loader behavior for the pinned r170 version. Do not assume arbitrary Blender lightmap nodes export.
-- Rebuild environment illumination with PMREM and appropriate runtime lights. Test directional shadow maps or baked static shadows; standard area lights do not automatically reproduce Cycles shadowing.
-- Use `GLTFLoader` from the installed Three.js addons. Add mesh compression and KTX2 only after proving the uncompressed asset is correct and configuring matching decoders.
-- Keep sRGB color textures and linear data textures distinct. Do not double-convert `THREE.Color` values. Use one final output transform; do not apply display conversion twice in a composer.
-- Existing city bloom uses a different pipeline from product rendering. Introduce a separately controlled daylight PBR pass if necessary; do not globally change tone mapping and break wireframe/product chapters.
+World contract: current source model is scaled by **400**, runtime is **Y-up**, and the tower front is **+X**. Existing hero bounds are min `[33,-2,-30]`, max `[97,216,52]`; floors start at `50.4`, height `3.6`, count `34`. Riser is `[79,31.4]` in XZ; selected room uses floor `19`, feed X `86.5`, entry Z `35.3`. These are current alignment constraints, not instructions to author a 216-meter mesh and multiply it by 400 again. Prefer an explicit asset-to-world transform and named empties/metadata for anchors. Verify transformed world positions before touching camera paths.
 
-Proposed targets, to measure rather than claim: runtime city under 200k visible triangles and 100 draw calls; GLB plus textures under 5 MB transferred; desktop poster under 500 KB, mobile under 250 KB at acceptable quality; DPR capped at 1.5 initially. Favor the poster on weak devices. Profile actual frame time on representative devices before enabling extra passes.
+Build a facade section or removable/open region aligned to the room reveal. Architectural frame/scan geometry and the wiring route must share coordinates. Do not independently eyeball them. Keep scan-only proxies separate from detailed beauty geometry to prevent edge extraction from exploding into every bevel triangle.
 
-## Poster-to-city continuity
+## 9. Required skills and when to use them
 
-This is a release gate, not a finishing detail.
+Resolve installed paths before execution. Read the actual SKILL.md once per skill. Skills guide workflow; they do not authorize broader scope or override this brief's preserved UI.
 
-Export a manifest with camera position, target, up axis, projection, horizontal/vertical frame bounds, aspect, render dimensions, crop, stable building transforms and key anchors. Include crown top, crown base and at least four surrounding roof corners.
+| Skill | Role |
+| --- | --- |
+| `reverse-engineer-anything` — `~/.agents/skills/reverse-engineer-anything/SKILL.md` | Evidence-based investigation of reference runtime/shipped artifacts; mark unknowns and partial coverage |
+| `design-taste-frontend` — `~/.codex/skills/taste-skill/SKILL.md` | Subject-specific art direction, image inventory, browser comparison and visual critique; keep current fonts/layout rather than draw a new site identity |
+| `blender-mcp` / backend guidance in `text-to-blender/references/mcp-backends.md` | Inspect actual Blender backend/version/scene; small bounded operations; preserve user's open work |
+| `blender-pro-workflow` | Blockout → camera → lighting → forms → materials → detail → export, with review gates |
+| `blender-cameras` | Match lens, world transforms, desktop/portrait framing and room approach |
+| `blender-materials` | Editable PBR material classes and swatch validation |
+| `blender-lighting` | Architectural daylight, environment, dusk and contact shadows |
+| `blender-uv-texturing` | Texel density, bake maps, UVs, normals and supported texture delivery |
+| `blender-rendering` | Reference stills and fallback renders, explicit color management and output settings |
+| `blender-export` and `blender-web-pipeline` | glTF export, LODs, texture/geometry compression and runtime parity checks |
+| `gsap-scrolltrigger` and `web-animation-design` | Only if future integration changes motion: deterministic scroll state, reverse seeking and reduced motion |
+| `fixing-motion-performance` | Only when profiling identifies actual frame-time or lifecycle problems |
 
-Fit both image and canvas using identical crop rules. Account for `object-fit`, `object-position`, canvas viewport, CSS mask and device aspect ratio. Retain the existing view-offset alignment logic where correct. If geometry changes, update both solid render and wireframe data from the manifest.
+Research used REA, design-taste-frontend, Blender materials/lighting/web-pipeline guidance and backend selection guidance. The live Blender addon was unreachable during this research; no scene/material inspection or creation succeeded. Do not claim this brief includes a Blender render or tested material assignment. Future implementation must begin with a fresh read-only connection check and identify the intended scene. No app-closing or render-farm actions are authorized here.
 
-Use a 50% overlay or difference image to compare projected anchors. Target no visible jump and approximately 2 CSS pixels or less anchor deviation at each test viewport. Compare with DOF off when checking geometry. An opacity crossfade is not a fix for a misaligned camera.
+## 10. Staged execution plan for a future implementation request
 
-Keep the existing `day → wireOn → extend → run → approach → drain → wireIn` sequence. Preserve the product handover transform and cable stop position. The current cable-over-city pass has a documented occlusion limitation: keep the clear route or implement shared depth/selective bloom before moving buildings into its path.
+### A. Baseline and contracts
 
-## Website integration and resilience
+Capture current day, dusk, scan, feeder, room and cable states at desktop/tablet/phone. Record asset bytes, visible triangle/draw-call counts, texture allocations, frame-time distributions and device/browser details. Export current camera/anchor metadata. Keep a clear asset rollback path; do not overwrite source or delete old media prematurely.
 
-Use responsive `<picture>` sources with explicit dimensions and a stable aspect box. Preserve the existing JPG until replacement outputs pass comparison. Show the opening image immediately; lazy-load runtime 3D after first paint. Do not hide the hero while waiting for a GLB or decoder.
+### B. Blockout and camera validation
 
-On mobile, reframe the city so the crown survives and the headline occupies a dedicated readable area. Do not simply crop desktop center and hope. Preserve current copy by default; any shortening needed to satisfy the skill’s two-line headline rule must be an explicit copy proposal, not a silent rewrite.
+Build only tower massing, floor rhythm, surrounding block hierarchy and ground. Compare screenshots inside the unchanged UI at 1440×900, 1920×1080, 768×1024 and 390×844. Check the entire approach corridor and room location. **Gate:** tower identity, empty text regions and story route work before detailed materials.
 
-Keep text selectable in HTML. Give meaningful image alt text or use empty alt when equivalent adjacent content fully covers its purpose. Preserve keyboard navigation, reduced-motion static layout, no-WebGL fallback and context-loss behavior. Keep navigation/contact targets as they currently work; report placeholder destinations rather than inventing brand contact details.
+### C. Representative material slice
 
-## Deliverables
+Finish one visible tower corner containing facade, glass, terrace, plant, podium/ground contact and one lit-room module. Produce daylight and dusk stills, then export that slice to the actual Three.js 0.170.0 runtime in an isolated development view. **Gate:** structural depth and surface distinction survive web lighting without excessive transmission, bloom or texture memory. Resolve offline/runtime differences before scaling to the city.
 
-Proposed paths, not claims that these files already exist:
+### D. Full kit and scan
 
-- `art/blender/tamira-city.blend`: organized source with named collections, cameras and materials.
-- `art/blender/build_city.py`: deterministic generation and rendering, documented invocation and version.
-- `art/data/city-layout.json`: shared geometry/anchor manifest and coordinate conventions.
-- `art/renders/`: lossless masters, material closeups and comparison sheets; keep large masters out of runtime assets.
-- `public/media/hero-city-desktop.avif`, `.webp`, mobile equivalents and compatible fallback.
-- `public/models/tamira-city.glb` and texture/decoder assets only if the runtime branch is used.
-- Focused changes to existing source files; update architecture and asset documentation to match the final implementation.
-- A validation report with screenshots, file sizes, render settings, remaining mismatches and measured runtime performance.
+Expand approved modules into a varied district. Build middle/far LODs and semantic metadata. Verify no obvious repeating atlas patches. Author lightweight scan proxies and calibrated point densities. **Gate:** one structure remains recognizably the same across solid, dusk and scan states; wire routes align.
 
-## Acceptance checklist
+### E. Controlled integration
 
-- Crown silhouette, opening and six-arm profile match the existing hero.
-- Orange reads as satin coated clay; neutral city reads as ceramic rather than white cardboard.
-- Bevel highlights are visible at actual CSS display size, not only in a zoomed render.
-- Light/shadow faces are distinct; ground contact remains readable; highlights retain detail.
-- Crown remains sharp enough to recognize; DOF does not hide material quality.
-- No excessive bloom, glow halos, heavy texture, unrealistic mirror reflections or glossy wet surfaces.
-- Main visual and copy coexist without collisions at 1440, 768 and 390 px widths, including short viewport heights.
-- Before/after transition overlays show no visible crown, road or roof jump.
-- All existing scroll chapters, reverse scrolling, resize behavior and static fallbacks continue to work.
-- Run `npm run build`; inspect browser errors and missing assets. A passing build alone is not visual validation.
-- During implementation, use the design-taste skill’s lint/inspection tools for the changed section and review the screenshots directly. Document full-page findings outside scope rather than claiming global compliance. No inspection or performance score has been run for this planning-only deliverable.
+Update loader/material handling and coordinated anchors. Keep chapter timings and all downstream behavior. Rebuild fallback posters from the accepted camera and art direction. Verify poster-to-live alignment and graceful load failures. Do not load full source-resolution maps or offline frames merely to make a desktop screenshot pass.
 
-Review three crops before final rendering: crown notch closeup, white roof/window closeup and ground contact shadow. Then review the whole hero in the actual page. Fix the three largest visible mismatches and repeat, up to three deliberate review rounds. Do not claim a reference match from code settings alone.
+### F. Validation and handoff
 
-## Technical sources and limits
+Run production build, existing skyline and finale checks, then inspect visual captures. Profile on real mobile hardware before declaring performance complete. Deliver editable source, scripts, maps, GLB, anchor metadata, licenses, before/after captures and a concise report distinguishing automated checks from visual judgment and untested risks.
 
-Consult the installed Three.js r170 code before using APIs shown in newer documentation.
+## 11. Proposed budgets and quality gates
 
-- [Three.js color management](https://threejs.org/manual/pages/color-management.html): linear working space, color texture handling and output conversion.
-- [Blender glTF exporter](https://docs.blender.org/manual/en/5.2/addons/scene_gltf2.html): material translation and export limitations, including area/world lighting.
-- [Three.js glTF loading](https://threejs.org/manual/pages/load-gltf.html): runtime asset loading workflow.
+These are initial project targets, **not measured outcomes or universal limits**. Revise from the representative slice using actual hardware. Count the whole opening, including filler, vegetation, scan, shadows and postprocessing; asset counts alone are misleading.
 
-The architectural recommendation is an engineering judgment based on the existing implementation and the supplied visual target. Material values, performance budgets and render settings are proposed starting points. Exact reference settings, external Blender source availability and real-device performance remain unverified.
+- Aim for 100k–200k visible triangles desktop and 40k–80k mobile across the city, with detail concentrated on the focal tower and approached surfaces. This is permission to spend geometry where it reads, not a requirement to fill a quota.
+- Aim for at most 80 city beauty draw calls desktop / 50 mobile before shadow/scan/postprocessing overhead; report total render calls too. Batch by compatible material, not by flattening all physical surfaces into one shader.
+- Start with 1–2K shared material maps and a dedicated hero set where justified. Use 4K only when a camera-distance comparison demonstrates a visible need. Track decoded GPU bytes and mip chains; compressed download size does not equal GPU memory.
+- Aim for an initial city asset payload below 6MB and city texture GPU allocation below 64MiB on mobile. Split optional detail from first paint if needed; measure network/decoder cost.
+- Target p95 frame time ≤16.7ms on the agreed desktop and ≤33.3ms on the agreed midrange phone, measured during actual scroll/scan/approach. Browser emulation is not a physical-device benchmark.
+- Avoid a quality cliff between devices: reduce far density, texture size, shadows, transmission and effects before destroying the hero tower's silhouette.
+
+Reject a candidate even if budgets pass when the architecture still looks melted, the tower floats, glass and stone respond identically, floor grids fight, plants intersect parapets, the room is misaligned, haze hides defects, scan continuity breaks, or portrait framing loses the subject.
+
+## 12. Regression and visual review checklist
+
+Future commands (not run for this documentation-only delivery):
+
+```sh
+npm run build
+CHROME_PATH=/Applications/Comet.app/Contents/MacOS/Comet node scripts/verify-skyline.mjs
+CHROME_PATH=/Applications/Comet.app/Contents/MacOS/Comet node scripts/verify-room-finale.mjs
+```
+
+Use muted Comet, isolate sessions and close only owned browser processes. Existing `?at=segment:progress` / `window.__tamira.seek()` development helpers support repeatable visual comparisons. Review `day:0`, intermediate/end `rise`, `wireOn:0.9`, `extend:0.95`, `run:0.98`, `approach:0.5`, `bundle:0.8`, `drain:0.35`, `drain:1`, `wireIn:0.5` and `copper:0.55`, plus reverse traversal and load/reduced-motion paths.
+
+Confirm unchanged font families/title sizing/layout; stable tower-to-room route; architectural scan alignment; readable feeders; bounded labels; blue/green remaining stationary during red extraction; continuous red identity within extraction; matched product handover; unchanged finale red/black/green insertion, board visibility and original final room lighting. Check first paint, load failure, resize, aspect changes, repeated enter/leave and cleanup without texture/composer leaks.
+
+Automated diagnostics do not certify architectural quality. Compare equal-size crops of tower corner, terrace planting, facade, street contact, dusk windows and scan silhouette against baseline and references. Judge at actual display size before zooming. Record one concrete reason for every accepted quality improvement; “premium” alone is not evidence.
+
+## 13. Deliverables and completion definition
+
+The present delivery is this prompt, the archived prior brief, Terminal captures, source/evidence notes and material previews. Website source remains unchanged by this task. Original U1–U6 attachment files still need to be added for a fully portable reference pack; their analysis is included above.
+
+A future production delivery should include:
+
+1. Editable `art/blender/skyline/` source scene with organized architecture/material/light/camera collections, reproducible build/export scripts and version information.
+2. Material source/license/checksum manifest, reusable authored material library and baked web maps with physical scale/color-space metadata.
+3. Optimized city asset(s), LOD/instance metadata, semantic material/scan tags and named anchor/camera data.
+4. Desktop and portrait fallback posters matching the accepted live view.
+5. Controlled runtime integration preserving all stated UI/story contracts.
+6. Before/after evidence at required aspect ratios, build/regression results, measured performance and explicit unresolved limitations.
+
+No commit, push, deployment, broad redesign or live Blender mutation is part of the current request.

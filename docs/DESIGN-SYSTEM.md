@@ -27,7 +27,7 @@ The layout, spacing and type metrics are adapted from **arrakis.tech**. They wer
 
 ### Composition rule: words left, object right
 - **Hero (DECISIONS 27):** a rounded media frame (`--frame-inset`, `--frame-radius`) holds the live street-level city on a daylight sky gradient (`--sky-top` `#d6e0e7` → `--sky-bottom` `#eef0ee`), with a white page surround. The headline sits top-left under the wordmark; the sentence sits bottom-left and the action bottom-right, held apart by the city (bottom row from 1025px, stacked below). The crown tower still layers in front of the headline. A sky-coloured haze sits behind the sentence (a 400 × 220px ellipse on desktop; a full-width lower band on phones), because the sharp clay edges would otherwise cut through the text. On the first scroll the frame's inset and radius open to zero over `rise` 0–0.35 while the copy lifts; the sky fades into the page colour over `rise` 0.55–0.95, so the wireframe handover is unchanged.
-- **Hero headline:** Geist Serif 400, `clamp(50px, 1.9rem + 4.2vw, 112px)` (91px at 1440), line-height 1, tracking −0.03em, max-width 10.6em (two lines on desktop; runs on at 860px and below).
+- **Hero headline:** Geist Serif 400, `clamp(40px, 1.52rem + 3.36vw, 89.6px)` (73px at 1440; reduced 20% on 2026-11-05), line-height 1, tracking −0.03em, max-width 10.6em (two lines on desktop; runs on at 860px and below).
 - **Hero sentence:** Instrument Sans, 18 → 24px, line-height 1.25, max-width 30rem, full ink.
 - **Action (`.btn`):** a 48px two-part button: a dark `#1b1b22` label (13px uppercase Instrument Sans 500, 0.06em) and a red `#d9362c` arrow block, with parallel 10px slanted edges and a 3px gap. On hover the colours swap and the arrow moves 3px. Preserve the existing Tamira copy and destination.
 - **Chapter copy:** upper-left, in a column about 31rem wide: title, then body, then a spec line.
@@ -47,7 +47,7 @@ Each size runs linearly from a 480px to a 1280px viewport, then holds.
 
 | Token | Size | Used for |
 |---|---|---|
-| Hero `.hero__title` | 50 → 112px (`clamp(3.125rem, 1.9rem + 4.2vw, 7rem)`) | leading 1, tracking −0.03em; overrides the legacy `--text-display` token |
+| Hero `.hero__title` | 40 → 89.6px (`clamp(2.5rem, 1.52rem + 3.36vw, 5.6rem)`) | leading 1, tracking −0.03em; overrides the legacy `--text-display` token |
 | `--text-heading-48` | 28 → 48px | end title, gauge number (Geist Serif) |
 | `--text-heading-40` | 26 → 40px | chapter titles (Geist Serif) |
 | `--text-body-20` | 17 → 20px | (available) |

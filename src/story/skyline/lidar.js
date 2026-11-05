@@ -17,6 +17,7 @@ export function textureSampler(image, size = 256) {
 const isFoliage = ([r, g, b]) => g > r * 1.08 && g > b * 1.02 && g - Math.min(r, b) > 0.05
 
 // Architectural outlines only: creases sharper than `angle`, open borders, no slivers, no trees.
+// `sample` (texture foliage test) is optional: the semantic scan proxy already excludes planting.
 export function extractEdges(geometry, sample, { angle = 32, minLen = 0.9 } = {}) {
   const pos = geometry.attributes.position, uv = geometry.attributes.uv, idx = geometry.index
   const weld = new Map(), wid = []
@@ -42,7 +43,7 @@ export function extractEdges(geometry, sample, { angle = 32, minLen = 0.9 } = {}
       const key = wp < wq ? `${wp}_${wq}` : `${wq}_${wp}`
       let ed = edges.get(key)
       if (!ed) {
-        ed = { p, q, normals: [], u: (uv.getX(p) + uv.getX(q)) / 2, v: (uv.getY(p) + uv.getY(q)) / 2 }
+        ed = { p, q, normals: [], u: uv ? (uv.getX(p) + uv.getX(q)) / 2 : 0, v: uv ? (uv.getY(p) + uv.getY(q)) / 2 : 0 }
         edges.set(key, ed)
       }
       ed.normals.push(n.clone())
@@ -55,7 +56,7 @@ export function extractEdges(geometry, sample, { angle = 32, minLen = 0.9 } = {}
     if (a.distanceTo(b) < minLen) continue
     const keep = ed.normals.length === 1 || (ed.normals.length >= 2 && ed.normals[0].dot(ed.normals[1]) < cos)
     if (!keep) continue
-    if (isFoliage(sample(ed.u, ed.v))) continue
+    if (sample && isFoliage(sample(ed.u, ed.v))) continue
     out.push(a.x, a.y, a.z, b.x, b.y, b.z)
   }
   const g = new THREE.BufferGeometry()
@@ -91,9 +92,11 @@ export function samplePoints(geometry, sample, count = 24000, seed = 3) {
     let u = rnd(), v = rnd()
     if (u + v > 1) { u = 1 - u; v = 1 - v }
     const w = 1 - u - v
-    const tu = uv.getX(ia) * w + uv.getX(ib) * u + uv.getX(ic) * v
-    const tv = uv.getY(ia) * w + uv.getY(ib) * u + uv.getY(ic) * v
-    if (isFoliage(sample(tu, tv))) continue
+    if (sample && uv) {
+      const tu = uv.getX(ia) * w + uv.getX(ib) * u + uv.getX(ic) * v
+      const tv = uv.getY(ia) * w + uv.getY(ib) * u + uv.getY(ic) * v
+      if (isFoliage(sample(tu, tv))) continue
+    }
     a.fromBufferAttribute(pos, ia); b.fromBufferAttribute(pos, ib); c.fromBufferAttribute(pos, ic)
     P.push(a.x * w + b.x * u + c.x * v, a.y * w + b.y * u + c.y * v, a.z * w + b.z * u + c.z * v)
     S.push(rnd())
