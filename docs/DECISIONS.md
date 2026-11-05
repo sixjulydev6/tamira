@@ -276,3 +276,23 @@ Use the original three-wire camera path, view offset and cubic red-wire insertio
 - **Validation:** `vite build` passed; the regression passed (0.006/0.004 px, 7 lighting checks). In Comet (muted) at 1440×900, the room diagnostics report the image painter and the fully lit room renders.
 - **Open:** the cause of the user-reported GLB breakage isn't diagnosed yet.
 
+## 35. Blendkit cable material tried and reverted (2026-11-05)
+
+The supplied bundled-cable material was applied, then rejected by the user and fully removed. Keep the original smooth red jacket and printing. The source `.blend` stays local as an unused reference.
+
+## 36. Replace only the hero story with the supplied skyline sequence (2026-11-05)
+
+- User requested the shared new site's hero story through its tower room and ceiling-wire follow, then the existing site's single-wire story unchanged. Keep current fonts and layouts.
+- Adapted the supplied `Wire website/temira` GLB, scan/LiDAR, underground network, tower climb, room and ceiling-wire camera path to vanilla Three.js in `src/story/skyline/`. No React UI, loader/rail, typography migration or three-core product was imported.
+- Added a red-wire/path/camera bridge into the current product entry, using matched lighting and environment. Existing copper-through-final-room choreography is preserved. The old city/avenue opener is inactive; its source/assets remain.
+- Existing frame/header/headline/sentence/action layout and fonts remain. New first-paint/static posters show the skyline. Two existing renderers are reused, and versions stay pinned.
+- Build and muted Comet desktop/portrait integration checks passed; finale regression preserves board visibility, cable identity/opacity, counts, alignment, lighting, reverse and reduced motion. No physical-device profiling is claimed.
+- Details and review links: [SKYLINE-HERO.md](SKYLINE-HERO.md).
+
+## 37. Three-core reveal and continuous red-core extraction (2026-11-05)
+
+- User supplied a screenshot of the three-core construction scene and requested red, blue and green wires, followed by the red wire pulling out into the existing single-core story instead of a direct match cut. Current fonts/layouts remain.
+- Added a 3-screen `bundle` segment after the ceiling follow: white outer sheath, translucent bedding, three independently insulated cores and four host-styled construction callouts. The source's brown and striped green cores are replaced with the requested red and plain green. Thirty copper strands use the current wire model.
+- `drain` is now 2.6 screens. The assembly's red `Wire` instance pulls forward while blue/green hold still; the camera follows. Only afterward do the assembly/background recede and the red path normalize into the existing entry. The final product frame remains matched, and all later product/finale choreography is retained. Total story is 32.05 screens.
+- Installed the user's 29 Emil skills into `~/.codex/skills` (28 new, one replaced with backup). Used `emil-animations` guidance for state continuity, paired easing, reversal, existing stack and reduced motion.
+- Build and desktop/portrait 30-frame integration checks passed in muted Comet, including core count, red identity/movement, stationary other cores, callout bounds/non-overlap, reverse seeks, unchanged fonts and reduced-motion rebuild. Updated finale regression is run separately.

@@ -1,3 +1,5 @@
+> **2026-11-05:** the active opener now uses the user-supplied `asset/new-proj-hero/Wire website/temira` city GLB, 2K atlas, scan/network/tower-room shaders and camera paths. Runtime files are `public/skyline/` and `src/story/skyline/`. See [SKYLINE-HERO.md](SKYLINE-HERO.md). Clay city assets below remain historical references.
+
 # References and assets
 
 ## Reference sites and material

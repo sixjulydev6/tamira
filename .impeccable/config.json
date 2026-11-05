@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "instrument sans",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-11-05T05:56:08.124Z",
+        "reason": "User confirmed: preserve the current site fonts; Instrument Sans is the existing body and UI face documented in docs/DESIGN-SYSTEM.md."
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "files": [
+          "src/style.css"
+        ],
+        "createdAt": "2026-11-05T05:56:08.143Z",
+        "reason": "User confirmed: preserve the current site fonts; Geist Serif is the existing heading face documented in docs/DESIGN-SYSTEM.md."
+      },
+      {
+        "rule": "tight-leading",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-11-05T05:56:08.161Z",
+        "reason": "User confirmed: preserve current layouts. Detector identifies the established hero sentence at 1.25 leading; docs/DESIGN-SYSTEM.md specifies this short display-support treatment. Chapter body text retains 1.5 leading."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-11-05T05:56:08.179Z",
+        "reason": "Agent verified false positive: gauge__scale is a 1px thermometer track with absolutely positioned ticks and external labels, not a text container. Adding container padding would distort the gauge."
+      }
+    ]
+  }
+}

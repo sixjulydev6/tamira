@@ -2,7 +2,11 @@
 
 Read [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md) first. Updated 2026-11-04; implementation commit `6d33386` is pushed to `origin/bishwa-wire-v1`. This documentation pass is local until explicitly committed/pushed.
 
-## Direction to preserve
+## Latest direction (2026-11-05)
+
+The current opener is the supplied GLB skyline → dusk → architectural scan → underground network → tower room → ceiling wire sequence, adapted to vanilla Three.js in `src/story/skyline/`. It now includes a `bundle` construction reveal with red/blue/green cores; the same red core physically pulls out during `drain` and leads into the unchanged single-core product story (DECISIONS 37). Preserve the existing fonts, header, frame and copy layout. Read `docs/SKYLINE-HERO.md`. The clay-city instructions below are historical and do not override this replacement.
+
+## Historical direction to preserve after the product handover
 
 - Live clay city/camera rise and traffic in Three.js, warm orange wireframe, avenue power-up, continuous city-to-product handover.
 - Single red core through copper, strands, flex, heat, flame and smoke.

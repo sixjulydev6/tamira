@@ -1,3 +1,5 @@
+> **2026-11-05 skyline update:** the old clay-city/avenue opener described below is replaced by the supplied GLB city, architectural scan, underground network, tower room and ceiling-wire sequence. The existing single-core product story and final room remain. See [SKYLINE-HERO.md](SKYLINE-HERO.md) for current implementation and segment meanings.
+
 # Live city and interactions
 
 The normal homepage now renders its city and camera rise in Three.js. It does not download or scrub the 72 rendered rise frames or request traffic videos. The transparent opening still remains for first paint, reduced motion and unavailable WebGL.

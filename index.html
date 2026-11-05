@@ -53,10 +53,9 @@
           <!-- Transparent street-level poster: first paint, reduced motion and WebGL fallback. -->
           <div class="hero__rise">
             <picture>
-              <source type="image/webp" srcset="/media/hero-rise-1920.webp 1920w, /media/hero-rise-3840.webp 3840w"
-                      sizes="max(100vw, 178svh)">
-              <img class="hero__opening" src="/media/hero-rise-1920.webp"
-                   alt="" width="1920" height="1080" decoding="async" fetchpriority="high">
+              <source media="(max-aspect-ratio: 4/5)" srcset="/skyline/poster-portrait.jpg">
+              <img class="hero__opening" src="/skyline/poster-desktop.jpg"
+                   alt="" width="1440" height="900" decoding="async" fetchpriority="high">
             </picture>
           </div>
         </div>

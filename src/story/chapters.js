@@ -4,6 +4,11 @@
 
 export const CHAPTERS = [
   {
+    id: "bundle",
+    title: "Inside a Tamira cable.",
+    body: "A protective sheath. Three insulated cores. Follow the red wire to see what is inside.",
+  },
+  {
     id: "copper",
     title: "Tamira is named after copper.",
     body: "Tāmra is the Sanskrit word for it. Our core is 99.97% pure, so power moves easily and less heat builds up in your walls.",
@@ -48,6 +53,10 @@ export const CHAPTERS = [
 
 /** Callouts pinned to the wire during the strands chapter. */
 export const LABELS = [
+  { id: "bundleSheath", k: "Outer sheath", v: "Protects the cores" },
+  { id: "bundleBedding", k: "Inner bedding", v: "Keeps them together" },
+  { id: "bundleInsulation", k: "Core insulation", v: "Red · blue · green" },
+  { id: "bundleConductor", k: "Conductor", v: "Stranded copper" },
   { id: "strands", k: "Copper", v: "30 fine strands" },
   { id: "jacket", k: "Jacket", v: "Stands up to heat and fire" },
   { id: "rating", k: "Rated for", v: "1100 volts" },

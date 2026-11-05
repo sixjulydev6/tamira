@@ -6,11 +6,13 @@ Marketing site for **Tamira**, a wiring and cable company. Built by Sixjuly.
 
 The homepage is a single scroll-driven story.
 
-1. A live **street-level clay city** rises into an isometric view, then turns into a glowing orange **wireframe network** on a warm night.
-2. A red single-core **house wire** runs along an avenue through it. The street lights and buildings light up behind its tip as it passes.
-3. The camera pushes in on the wire, the city drains away into its tip, and the page turns light.
-4. The same wire tells the product story: copper, strands, flex, heat, flame and smoke.
-5. The same red wire seats in the back of the original five-switch board, then black and green follow it into N and E, using the source camera movement and insertion timing without a canvas fade; the camera travels into the original living room and its five lighting groups switch on. See [docs/ROOM-FINALE.md](docs/ROOM-FINALE.md).
+1. A live GLB skyline moves from daylight to dusk, then dissolves into architectural scan lines and LiDAR points.
+2. An underground network connects the city; one feeder climbs the tower to a furnished room that builds and lights up.
+3. The camera follows the ceiling cable into a three-core construction reveal. Red pulls out from blue and green; the camera follows it into the existing single-wire story as the page turns light.
+4. The existing wire story continues through copper, strands, flex, heat, flame and smoke.
+5. The red wire seats in the rear switchboard, black and green follow into N/E, and the original camera enters the final rendered living-room sequence.
+
+The hero retains the existing Tamira fonts, header and copy layout. See [docs/SKYLINE-HERO.md](docs/SKYLINE-HERO.md) for the supplied project's integration and review links.
 
 The other site sections (Consumers, Industries, Investors, Company) come in a later stage.
 
@@ -39,12 +41,13 @@ The site is plain HTML, CSS and JavaScript, with no framework. Versions are pinn
 | GSAP + ScrollTrigger | 3.12.5 | the one scroll timeline and the page-load reveal |
 | Three.js | 0.170.0 | the wireframe city and the wire, all live 3D |
 
-Three.js and the story scene are lazy-loaded after first paint. The city, camera rise, moving traffic, wireframe and product interactions are now live Three.js geometry controlled by GSAP. One transparent opening still remains for first paint and fallback; no rendered rise sequence or traffic video is requested. The ending deliberately uses the original rendered room images for an exact room match. See [docs/LIVE-3D.md](docs/LIVE-3D.md) for implementation and checks. The older Blender sources and renders remain in `art/` and `public/media/` as references.
+Three.js and the story scene are lazy-loaded after first paint. The opening loads the supplied optimized skyline GLB and 2K atlas, then renders the scan, wiring and tower room live. Matching desktop/portrait posters cover loading and static fallback. The final living room uses the 48 rebuilt rendered images. The old clay-city implementation and offline assets remain as references; normal browsing no longer loads that opener.
 
 
 ## Current handoff
 
-Implementation commit [`6d33386`](https://github.com/akhil515435-design/tamira-site/commit/6d33386) is pushed to `bishwa-wire-v1`. Use **Comet** for browser review. The board visibility regression is fixed in code; post-fix visual review remains outstanding after Comet tool timeouts. Earlier camera-alignment tests did not detect that hidden-board bug. See [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md) for the complete state and verification limits.
+Local commit `798e73c` contains the earlier site/room updates; its push needs explicit destination approval after automatic review blocked it. The new skyline opening is an uncommitted integration. Build and desktop/portrait skyline/finale checks pass in muted Comet. See [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md).
+
 
 ## Documentation
 

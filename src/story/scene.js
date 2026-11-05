@@ -1,18 +1,12 @@
 import * as THREE from "three";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { buildCity, FRAME_CENTRE, FRAME_W, AVENUE } from "./city.js";
-import { buildDaylightCity } from "./daylight.js";
 import { createFinaleStage } from "./finale-stage.js";
 import { finaleU } from "./finale-timing.js";
 import { Wire } from "./wire.js";
+import { createSkyline } from "./skyline/index.js";
 import { buildProps } from "./props.js";
 import { local, smooth, lerp, windowed, clamp01, progressOf } from "./timeline.js";
 
-const VIDEO_W = 1920, VIDEO_H = 1080;
 const DEG = Math.PI / 180;
 
 /* path shapes in normalised screen space of the wire camera (x, y in −1…1); tail first, tip last */
@@ -22,13 +16,6 @@ const SHAPES = {
   wave:   [[-1.75, -0.36], [-0.95, -0.24], [-0.32, -0.4], [0.3, -0.26], [0.95, -0.34], [1.75, -0.22]],
   finale: [[-1.75, -1.05], [-1.0, -0.72], [-0.42, -0.5], [0.04, -0.3], [0.3, -0.08], [0.44, 0.02]],
 };
-
-/* The wire in the city is the same model as the product wire, scaled up (jacket radius 2.2 m).
-   Where its tip stops on the avenue: */
-const CITY_SCALE = 2.2;
-const HEAD_Y = AVENUE.tipY;
-const EXT_TARGET = new THREE.Vector3(205, 10, 0);   // centre of the pulled-back view
-const EXT_FRAME_W = 780;                             // metres across the pulled-back view
 
 export function createStory({ canvas, wireCanvas, stage, media }) {
   const makeRenderer = (el) => {
@@ -42,57 +29,14 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   const wireRenderer = makeRenderer(wireCanvas);
   wireRenderer.toneMapping = THREE.NeutralToneMapping;
 
-  /* ---------------------------------------------------------------- city */
-  const shared = {
-    uBg: { value: new THREE.Color() }, uRes: { value: new THREE.Vector2() }, uStage: { value: new THREE.Vector4() },
-    uMaskMix: { value: 1 }, uMaskMode: { value: 0 }, uDrain: { value: 0 }, uDrainNdc: { value: new THREE.Vector2(-1.02, -1.0) },
-    uFade: { value: 1 }, uReveal: { value: 0 }, uExtend: { value: 0 }, uFlow: { value: 0 }, uHead: { value: -1e4 }, uPower: { value: -1e4 },
-    uDpr: { value: 1 },
-    uLine: { value: new THREE.Color("#e8582a") }, uLineHot: { value: new THREE.Color("#ffc69c") },   // crown orange, peach
-  };
-  const cityScene = new THREE.Scene();
-  const city = buildCity(shared);
-  cityScene.add(city.group);
-  const cityCam = new THREE.PerspectiveCamera(1, VIDEO_W / VIDEO_H, 10, 100000);
-  cityCam.up.set(0, 0, 1);
-
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(cityScene, cityCam));
-  // threshold keeps the dark page and the hulls out of the glow; only the lines and lamps bloom
-  const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.75, 0.4, 0.05);
-  composer.addPass(bloom);
-  composer.addPass(new OutputPass());
-
-  /* The city wire, drawn after the bloom so it stays a crisp product. Its world is the city's
-     (Z up, metres). Lights and reflections are the product scene's, rotated by the same mapping
-     M used for the hand-over (product x → city +Y, product y → city +Z, product z → city +X),
-     so at the hand-over both renders are the same picture. */
+  const skyline = createSkyline(renderer);
+  let lastProgress = 0, lastBgColor = "#ffffff";
   const environmentTargets = [];
   function environmentFor(renderer) {
     const generator = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment();
     const target = generator.fromScene(room, 0.04);
     generator.dispose(); room.dispose(); environmentTargets.push(target); return target.texture;
   }
-  const cityWireScene = new THREE.Scene();
-  cityWireScene.environment = environmentFor(renderer);
-  cityWireScene.environmentIntensity = 0.85;
-  // The lookup must take city directions to product directions (city X,Y,Z → product z,x,y). three.js
-  // negates the Euler angles before building the shader's lookup matrix, so the angles are given here
-  // already negated. (Setting them from that matrix directly turned the room environment upside down
-  // on the city wire: city up looked up the product floor, lighting the jacket from below.)
-  { const lookup = new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().set(0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1));
-    cityWireScene.environmentRotation.set(-lookup.x, -lookup.y, -lookup.z, lookup.order); }
-  { const k = new THREE.DirectionalLight(0xffffff, 2.2); k.position.set(12, -6, 10); cityWireScene.add(k);
-    const r = new THREE.DirectionalLight(0xdfe6ff, 1.1); r.position.set(-6, 8, -4); cityWireScene.add(r); }
-  const cityWire = new Wire();
-  cityWire.group.scale.setScalar(CITY_SCALE);
-  cityWireScene.add(cityWire.group);
-  const FACING_X = new THREE.Vector3(1, 0, 0);
-
-  const daylight = buildDaylightCity(renderer);
-  daylight.scene.environment = cityWireScene.environment;
-  daylight.scene.environmentIntensity = 0.25;
-  let lastProgress = 0, lastBgColor = "#ffffff", trafficTime = 0;
 
   /* ---------------------------------------------------------------- product wire world */
   const wireScene = new THREE.Scene();
@@ -108,37 +52,18 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   const wireCam = new THREE.PerspectiveCamera(28, 1, 0.5, 600);
 
   /* ---------------------------------------------------------------- layout */
-  let W = 1, H = 1, frame = { x: 0, y: 0, w: 1, h: 1 }, halfW = 13, halfH = 7.5, d0 = 30, portrait = false;
+  let W = 1, H = 1, halfW = 13, halfH = 7.5, d0 = 30, portrait = false;
   const shapeWorld = {};
   const toWorld = ([nx, ny]) => {
     const y = portrait ? ny * 0.5 - 0.32 : ny;     // keep the wire below the copy on tall screens
     return new THREE.Vector3(nx * halfW, y * halfH, 0);
   };
-  /** M: product-wire world → city world */
-  const toCity = (v) => {
-    const tip = shapeWorld.entry[5];
-    return new THREE.Vector3(AVENUE.x + v.z * CITY_SCALE, HEAD_Y + (v.x - tip.x) * CITY_SCALE, (v.y + halfH + 1) * CITY_SCALE);
-  };
-  let cityPathLifted = [], cityPathFlat = [], cityPathHand = [], entryLength = 1;
-
   function resize() {
     const r = canvas.getBoundingClientRect();
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     renderer.setSize(W, H, false);
     wireRenderer.setSize(W, H, false);
-    composer.setSize(W, H);
-    shared.uRes.value.set(W * renderer.getPixelRatio(), H * renderer.getPixelRatio());
-    shared.uDpr.value = renderer.getPixelRatio();      // edge strips are sized in CSS px
-
-    // where the day render actually sits: object-fit: cover inside the stage, at its object-position
-    const s = stage.getBoundingClientRect();
-    const [opx, opy] = getComputedStyle(media).objectPosition.split(" ").map((v) => parseFloat(v) / 100);
-    const k = Math.max(s.width / VIDEO_W, s.height / VIDEO_H);
-    const dw = VIDEO_W * k, dh = VIDEO_H * k;
-    frame = { x: s.left - r.left + (s.width - dw) * opx, y: s.top - r.top + (s.height - dh) * opy, w: dw, h: dh };
-    const pr = renderer.getPixelRatio();
-    shared.uStage.value.set((s.left - r.left) * pr, (s.top - r.top) * pr, s.width * pr, s.height * pr);
-    shared.uMaskMode.value = window.matchMedia("(max-width: 860px)").matches ? 1 : 0;
+    skyline.resize(W, H);
 
     // product camera framing
     const aspect = W / H;
@@ -151,97 +76,6 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     for (const k2 in SHAPES) shapeWorld[k2] = SHAPES[k2].map(toWorld);
     props.setConduitPath([toWorld([-0.3, -0.565]), toWorld([0.18, -0.5]), toWorld([0.37, -0.25]), toWorld([0.41, 0.22])]);
 
-    // the city wire's path: straight along the avenue, and the same path with its tip lifted into
-    // exactly the product wire's opening shape (mapped by M)
-    const R = CITY_SCALE;
-    const lifted = shapeWorld.entry.slice(1).map(toCity);
-    const lead = [HEAD_Y - 1700, HEAD_Y - 900, HEAD_Y - 160].map((y) => new THREE.Vector3(AVENUE.x, y, R));
-    cityPathLifted = [...lead, ...lifted];
-    cityPathFlat = cityPathLifted.map((v) => new THREE.Vector3(AVENUE.x, v.y, R));
-    // ...and, for the end of the drain (the city already gone), exactly the product wire's path: the
-    // whole entry shape, with its tail continued along the curve's own end tangent. The first ghost
-    // point is the one CatmullRomCurve3 uses for an open end (2·p0 − p1), so every visible segment is
-    // computed from the same four points as the product wire's.
-    const e = shapeWorld.entry, g1 = e[0].clone().multiplyScalar(2).sub(e[1]), g0 = g1.clone().multiplyScalar(2).sub(e[0]);
-    cityPathHand = [g0, g1, ...e].map(toCity);
-    entryLength = new THREE.CatmullRomCurve3(e, false, "centripetal", 0.5).getLength();
-  }
-
-  /* ---------------------------------------------------------------- city camera
-     Poses are { target, el, az, D, hfov, vb }. The first reproduces the Blender ortho camera
-     (a 0.5° lens from 46 km is orthographic to well under a pixel) mapped onto the video's
-     on-screen frame (vb = 0). vb = 1 is full bleed. */
-  const toCam = (el, az) => new THREE.Vector3(Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el));
-  const isoD = (frameW) => (frameW / 2) / Math.tan(0.25 * DEG);
-  const lerpPose = (a, b, t) => ({
-    target: a.target.clone().lerp(b.target, t),
-    el: lerp(a.el, b.el, t), az: lerp(a.az, b.az, t),
-    D: Math.exp(lerp(Math.log(a.D), Math.log(b.D), t)),
-    hfov: Math.exp(lerp(Math.log(a.hfov), Math.log(b.hfov), t)),
-    vb: lerp(a.vb, b.vb, t),
-  });
-
-  /** 0–1 progress of the push-in: 0.6 by the end of "approach" (the close diagonal frame, tip still
-      on the street), 1 shortly before the drain ends */
-  const approachK = (p) => smooth(0, 1, 0.6 * local(p, "approach") + 0.4 * smooth(0, 0.85, local(p, "drain")));
-
-  function cityPose(p) {
-    const L = (id) => local(p, id);
-    const handoff = { target: FRAME_CENTRE.clone(), el: 38, az: -45, D: isoD(FRAME_W), hfov: 0.5, vb: 0 };
-    const wide = { target: EXT_TARGET.clone().add(new THREE.Vector3(0, 70 * smooth(0, 1, L("run")), 0)), el: 38, az: -45, D: isoD(EXT_FRAME_W), hfov: 0.5, vb: 1 };
-    // the product camera, mapped into the city by M: the hand-over frame
-    const handTarget = toCity(new THREE.Vector3(0, 0, 0));
-    const hand = { target: handTarget, el: 0, az: 0, D: d0 * CITY_SCALE, hfov: 2 * Math.atan(Math.tan(14 * DEG) * (W / H)) / DEG, vb: 1 };
-
-    let pose = lerpPose(handoff, wide, smooth(0, 1, L("extend")));
-    // one continuous push-in, wide diagonal → close side view of the tip. The wire already runs
-    // lower-left → upper-right in the wide view, so the camera only eases 45° round and levels off;
-    // it never goes behind the wire. ~70% of the move happens in "approach" (ending on the close
-    // diagonal frame); the rest settles during the drain while the city goes away.
-    const k = approachK(p);
-    const move = lerpPose(pose, hand, k);
-    // angle and lens lag the distance a little, so the city reads as a view first and flattens late
-    move.el = lerp(pose.el, hand.el, smooth(0.15, 1, k));
-    move.az = lerp(pose.az, hand.az, smooth(0.1, 1, k));
-    return move;
-  }
-
-  function placeCityCam(pose) {
-    const el = pose.el * DEG, az = pose.az * DEG, hfov = pose.hfov * DEG;
-    cityCam.position.copy(pose.target).addScaledVector(toCam(el, az), pose.D);
-    cityCam.lookAt(pose.target);
-    cityCam.near = Math.max(0.5, pose.D - 2500); cityCam.far = pose.D + 4000;
-    // blend the view window from "video frame inside the stage" to "whole canvas"
-    const fb = pose.vb;
-    const fullW = lerp(frame.w, W, fb), fullH = lerp(frame.h, H, fb);
-    const aspect = fullW / fullH;
-    cityCam.aspect = aspect;
-    cityCam.fov = 2 * Math.atan(Math.tan(hfov / 2) / aspect) / DEG;
-    cityCam.setViewOffset(fullW, fullH, lerp(-frame.x, 0, fb), lerp(-frame.y, 0, fb), W, H);
-    cityCam.updateProjectionMatrix();
-    // the day image is full screen with no CSS mask (the frame opens fully before "wireOn"),
-    // so the shaders' copy of that mask stays off
-    shared.uMaskMix.value = 0;
-  }
-
-  /* the city wire: runs along the avenue, then lifts its tip into the product shape */
-  function cityWireState(p) {
-    // the tip lifts into the product shape over the second half of the push-in
-    const lift = smooth(0.6, 1, approachK(p));    // lifts only once the city is going
-    // after the city has faded (drain 0.28), the tail, tail length and strand glow settle onto the
-    // product wire's, so the hand-over shows one identical wire
-    const hand = smooth(0.3, 0.95, local(p, "drain"));
-    const pts = cityPathFlat.map((v, i) => v.clone().lerp(cityPathLifted[i], lift).lerp(cityPathHand[i], hand).divideScalar(CITY_SCALE));
-    cityWire.setPath(pts, FACING_X);
-    const P = cityWire.params;
-    // tip travels from off-screen (900 m back) to HEAD_Y along the straight avenue
-    const back = (1 - smooth(0.04, 0.92, local(p, "run"))) * 900 / CITY_SCALE;
-    P.head = Math.max(0.02, (cityWire.length - back) / cityWire.length);
-    P.tailLen = lerp(340, entryLength + 30, hand);   // the product wire's tail: 30 past its first point
-    P.strip = 3.4; P.fan = 0.45; P.glow = 1 - hand; P.cut = 0; P.heat = 0; P.char = 0;
-    cityWire.update();
-    const tip = cityWire.frameAt(cityWire.headDist, { p: new THREE.Vector3(), t: new THREE.Vector3(), n: new THREE.Vector3(), b: new THREE.Vector3() }).p;
-    return tip.multiplyScalar(CITY_SCALE);
   }
 
   /* ---------------------------------------------------------------- product wire choreography */
@@ -342,63 +176,20 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   /* label anchors in screen px, for the strands chapter */
   const project = (v) => { const q = v.clone().project(wireCam); return { x: (q.x * 0.5 + 0.5) * W, y: (-q.y * 0.5 + 0.5) * H, z: q.z }; };
 
-  function renderDay(p) {
-    const wireOn = local(p, "wireOn");
-    daylight.placeCamera(local(p, "rise"), frame, W, H);
-    daylight.setOpacity(1 - smooth(0.05, 0.7, wireOn));
-    daylight.traffic(trafficTime);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-    renderer.setClearColor(lastBgColor, 0);
-    if (wireOn > 0) { renderer.autoClear = false; renderer.clearDepth(); }
-    renderer.render(daylight.scene, daylight.camera);
-    renderer.autoClear = true;
-    renderer.toneMappingExposure = 1;
-  }
-
   function update(p, { bg }) {
     lastProgress = p; lastBgColor = bg;
     const bgCol = new THREE.Color(bg);          // already in linear working space (ColorManagement)
-    shared.uBg.value.copy(bgCol);
     renderer.setClearColor(bgCol);
     wireRenderer.setClearColor(bgCol);
 
-    const wireOn = local(p, "wireOn"), drain = local(p, "drain"), wireIn = local(p, "wireIn");
-    const showCity = wireOn > 0 && wireIn < 0.5;
+    const wireIn = local(p, "wireIn");
     const showWire = wireIn > 0;
     const out = { anchors: null };
-
-    if (showCity) {
-      placeCityCam(cityPose(p));
-      const showCityWire = local(p, "run") > 0;
-      const tip = showCityWire ? cityWireState(p) : null;
-
-      shared.uReveal.value = smooth(0, 0.85, wireOn);
-      shared.uExtend.value = smooth(0, 0.85, local(p, "extend"));
-      shared.uHead.value = tip ? tip.y : -1e4;
-      // power front: exactly at the tip while the wire runs (nothing ever lights ahead of it); once
-      // the wire has stopped, it keeps spreading so the rest of the city is lit by street level
-      shared.uPower.value = tip ? tip.y + 900 * smooth(0, 0.8, local(p, "approach")) : -1e4;
-      // the network drains into the wire's tip; it is gone before the page lightens
-      if (tip) { const q = tip.clone().project(cityCam); shared.uDrainNdc.value.set(q.x, q.y); }
-      // fast: the city is gone in the first quarter of the drain, as the page lightens
-      shared.uDrain.value = smooth(0.0, 0.25, drain);
-      shared.uFlow.value = drain * 24;
-      shared.uFade.value = 1 - smooth(0.16, 0.28, drain);
-      // glow only once the page is dark (no glow on the light day page), off again for the drain
-      bloom.strength = 0.75 * smooth(0.35, 0.6, wireOn) * (1 - smooth(0.05, 0.25, drain));
-      renderer.toneMapping = THREE.NoToneMapping;
-      composer.render();
-
-      if (showCityWire) {
-        renderer.toneMapping = THREE.NeutralToneMapping;
-        renderer.autoClear = false;
-        renderer.clearDepth();
-        renderer.render(cityWireScene, cityCam);
-        renderer.autoClear = true;
-      }
+    if (wireIn < 0.5) {
+      skyline.update(p, bg, { points: shapeWorld.entry, d0 });
+      skyline.render();
+      if(local(p,'bundle')>0&&local(p,'drain')===0)out.anchors=skyline.bundleAnchors();
     }
-    if (wireOn < 0.7 && wireIn === 0) renderDay(p);
     const finale = local(p, "finale");
     if (!finaleStage && (local(p, "smoke") > .25 || finale > 0)) finaleStage = createFinaleStage(wireRenderer, wireScene, wire);
     if (showWire && finale > 0) {
@@ -425,9 +216,6 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
 
   // compile everything up front so the first visible frame never stalls
   resize();
-  renderer.compile(cityScene, cityCam);
-  cityWire.setPath(cityPathFlat.map((v) => v.clone().divideScalar(CITY_SCALE)), FACING_X); cityWire.update();
-  renderer.compile(cityWireScene, cityCam);
   wire.setPath(shapeWorld.entry); wire.update();
   wireRenderer.compile(wireScene, wireCam);
 
@@ -435,7 +223,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   function dispose() {
     if (disposed) return; disposed = true;
     const geometry = new Set(), material = new Set(), texture = new Set();
-    for (const scene of [cityScene, cityWireScene, wireScene]) {
+    for (const scene of [wireScene]) {
       if (scene.environment) texture.add(scene.environment);
       scene.traverse(o => {
         if (o.geometry) geometry.add(o.geometry);
@@ -448,15 +236,17 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     }
     geometry.forEach(g => g.dispose()); material.forEach(m => m.dispose()); texture.forEach(t => t.dispose());
     finaleStage?.dispose();
-    daylight.dispose(); environmentTargets.forEach(target => target.dispose());
-    composer.passes.forEach(pass => pass.dispose?.()); composer.dispose(); renderer.dispose(); wireRenderer.dispose();
+    skyline.dispose(); environmentTargets.forEach(target => target.dispose());
+    renderer.dispose(); wireRenderer.dispose();
   }
   return {
     update, resize, dispose,
+    get ready() { return skyline.loaded; },
+    get error() { return skyline.error; },
     tick(delta) {
-      if (disposed || local(lastProgress, "wireOn") > 0 || document.hidden) return;
-      trafficTime += Math.min(delta, 0.05); renderDay(lastProgress);
+      if (disposed || local(lastProgress, "wireIn") >= .5 || document.hidden) return;
+      skyline.tick(delta);
     },
-    diagnostics: () => ({ ...daylight.stats, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, progress: lastProgress, finale: finaleStage?.diagnostics() }),
+    diagnostics: () => ({ skyline: skyline.diagnostics(), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, progress: lastProgress, finale: finaleStage?.diagnostics() }),
   };
 }

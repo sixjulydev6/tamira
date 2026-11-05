@@ -6,12 +6,13 @@
 
 export const SEGMENTS = [
   { id: "day",     screens: 0.35 }, // street level: the crown tower rising into the headline, held: a short beat before anything moves
-  { id: "rise",    screens: 1.6 },  // the copy lifts away; the camera rises from street level to the isometric view (rendered frames)
-  { id: "wireOn",  screens: 1.2 },  // day → wireframe: orange lines draw on over the render's edges, page white → warm night
-  { id: "extend",  screens: 1.4 },  // camera pulls back; more city grows in around a street-lit avenue
-  { id: "run",     screens: 2.2 },  // the wire runs along the avenue; street lights switch on as its tip passes
-  { id: "approach", screens: 1.4 }, // push-in from the diagonal city view until the wire is a close diagonal across the frame
-  { id: "drain",   screens: 1.0 },  // from that frame the city drains away fast and the page turns lavender while the camera settles
+  { id: "rise",    screens: 1.6 },  // supplied skyline: daylight → dusk
+  { id: "wireOn",  screens: 1.2 },  // architectural scan and LiDAR reveal
+  { id: "extend",  screens: 1.4 },  // underground network grows from the substation
+  { id: "run",     screens: 2.2 },  // follow one feeder up the tower; room builds and lights
+  { id: "approach", screens: 2.0 }, // through the room's open corner, along its ceiling wire
+  { id: "bundle",  screens: 3.0 }, // sheath/bedding open; red, blue and green cores are exposed
+  { id: "drain",   screens: 2.6 },  // red pulls out of the assembly; camera follows into the product view
   { id: "wireIn",  screens: 0.9 },  // hand-over to the product wire (identical framing), glow cools
   { id: "copper",  screens: 1.5 },
   { id: "strands", screens: 1.7 },

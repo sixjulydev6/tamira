@@ -480,6 +480,11 @@ a { color: inherit; text-decoration: none; }
 }
 .label__k { font-size: 0.8125rem; letter-spacing: var(--tracking-small); color: color-mix(in oklab, var(--ink), transparent 45%); }
 .label__v { font-size: var(--text-body-15); color: var(--ink); }
+.bundle-leaders { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bundle-leaders path { fill: none; stroke: var(--ink); stroke-opacity: .45; stroke-width: 1; }
+.label--bundle .label__pin::after { display: none; }
+.label--bundle .label__tag { left: 0; top: 0; bottom: auto; white-space: normal; padding: 8px 10px; }
+.label--bundle .label__v { font-size: 13px; line-height: 1.4; }
 
 /* temperature gauge (heat chapter) */
 .gauge {
@@ -556,7 +561,7 @@ a { color: inherit; text-decoration: none; }
   margin-top: calc(var(--space) * 8);
   padding: 0 calc(var(--space) * 5);
   border-radius: var(--radius-xs);
-  background: var(--red);
+  background: #d9362c;          /* same red as the hero arrow; white text contrast 4.66:1 */
   color: #fff;
   font-size: var(--text-nav);
   font-weight: 500;              /* white on this red needs the heavier weight */

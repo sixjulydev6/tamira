@@ -42,10 +42,17 @@ const labelsEl = document.querySelector(".story__labels");
 const labelEls = Object.fromEntries(LABELS.map((l) => {
   const el = document.createElement("div");
   el.className = "label";
+  if(l.id.startsWith('bundle'))el.classList.add('label--bundle');
   el.innerHTML = `<span class="label__pin"></span><span class="label__tag"><span class="label__k">${l.k}</span><span class="label__v">${l.v}</span></span>`;
   labelsEl.append(el);
   return [l.id, el];
 }));
+const bundleLeaders=document.createElementNS('http://www.w3.org/2000/svg','svg');
+bundleLeaders.classList.add('bundle-leaders');bundleLeaders.setAttribute('aria-hidden','true');
+const bundlePaths=Object.fromEntries(LABELS.filter(l=>l.id.startsWith('bundle')).map(l=>{
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');bundleLeaders.append(path);return [l.id,path];
+}));
+labelsEl.prepend(bundleLeaders);
 const gauge = {
   el: document.querySelector(".gauge"),
   n: document.querySelector(".gauge__n"),
@@ -59,6 +66,9 @@ const storyEl = document.querySelector(".story");
 function goStatic() {
   storyEl.classList.add("is-static");
   root.classList.add("is-static");
+  root.classList.remove("is-dark");
+  root.style.setProperty("--bg", "#ffffff");
+  root.style.setProperty("--ink", "#000000");
   root.style.removeProperty("--story-screens");
   const stage = document.querySelector(".story__stage");
   stage.style.clipPath = ""; stage.style.removeProperty("--sky");
@@ -119,7 +129,7 @@ function runStory() {
     try {
       story = createStory({ canvas, wireCanvas, stage: heroStage, media: dayImage });
       render(state.p);
-      storyEl.classList.add("is-live-3d");
+      // The GLB and texture load asynchronously; keep the poster until ready.
     } catch (err) {
       console.warn("3D unavailable, showing the static story", err);
       master.scrollTrigger?.kill(); master.pause(); goStatic();
@@ -133,6 +143,12 @@ function runStory() {
   // The day city, camera rise and traffic are live meshes in the existing city renderer.
   // Still images remain visible only until WebGL is ready, or in the static fallback.
   const animateTraffic = (_time, deltaMs) => {
+    if (story?.error && !storyEl.classList.contains("is-static")) {
+      master.scrollTrigger?.kill(); master.pause(); goStatic(); return;
+    }
+    if (story?.ready && !storyEl.classList.contains("is-live-3d")) {
+      storyEl.classList.add("is-live-3d"); render(state.p);
+    }
     if (story && !storyEl.classList.contains("is-static")) story.tick(deltaMs / 1000);
     if (!storyEl.classList.contains("is-static")) room.update(state.p);
   };
@@ -156,7 +172,7 @@ function runStory() {
     const clip = u > 0 ? `inset(${(frameInset * u).toFixed(2)}px round ${(frameRadius * u).toFixed(2)}px)` : "none";
     if (clip !== lastClip) { storyStage.style.clipPath = clip; lastClip = clip; }
     storyStage.style.setProperty("--sky", (1 - smooth(0.55, 0.95, rise)).toFixed(3));
-    riseLayer.style.visibility = story ? "hidden" : "visible";
+    riseLayer.style.visibility = story?.ready ? "hidden" : "visible";
     isoLayer.style.opacity = "0";
     const lift = smooth(0.0, 0.2, rise);
     for (const el of heroParts) {
@@ -170,8 +186,8 @@ function runStory() {
     const wireOn = local(p, "wireOn");
     heroStage.style.opacity = String(1 - smooth(0.3, 0.6, wireOn));
     heroStage.style.visibility = wireOn >= 1 ? "hidden" : "";
-    canvas.style.opacity = story ? "1" : "0";
-    canvas.style.zIndex = wireOn > 0 ? "1" : "2";
+    canvas.style.opacity = story?.ready ? "1" : "0";
+    canvas.style.zIndex = "0";
     // hand-over: the product wire's canvas fades in over an identical frame of the city wire
     const wireIn = local(p, "wireIn");
     wireCanvas.style.opacity = String(smooth(0, 0.4, wireIn));
@@ -192,13 +208,27 @@ function runStory() {
     if (story) anchors = story.update(p, { bg }).anchors;
 
     // labels pinned to the wire
-    const la = windowed(local(p, "strands"), 0.36, 0.5, 0.76, 0.88);
+    const la = Math.max(windowed(local(p, "strands"), 0.36, 0.5, 0.76, 0.88),windowed(local(p,"bundle"),.48,.65,.85,.98));
     labelsEl.style.opacity = la.toFixed(3);
     labelsEl.style.visibility = la > 0.001 && anchors ? "visible" : "hidden";
     if (anchors && la > 0.001) for (const id in labelEls) {
       const a = anchors[id];
+      labelEls[id].style.visibility = a ? "visible" : "hidden";
+      if(!a)continue;
       labelEls[id].style.transform = `translate3d(${a.x.toFixed(1)}px, ${a.y.toFixed(1)}px, 0)`;
+      if(id.startsWith('bundle')) {
+        const index=Object.keys(bundlePaths).indexOf(id),phone=innerWidth<760;
+        const margin=phone?32:60,gap=phone?16:24,cols=phone?2:4;
+        const width=Math.min(phone?180:200,(innerWidth-2*margin-gap*(cols-1))/cols);
+        const x=phone?margin+(index%2)*(width+gap):margin+index*(innerWidth-2*margin-width)/3;
+        const y=phone?innerHeight*(index<2?.78:.89):innerHeight*.86;
+        const tag=labelEls[id].querySelector('.label__tag');
+        tag.style.width=`${width}px`;
+        tag.style.transform=`translate3d(${x-a.x}px,${y-a.y}px,0)`;
+        bundlePaths[id].setAttribute('d',`M ${a.x} ${a.y} L ${x+width/2} ${y-12} L ${x+width/2} ${y}`);
+      }
     }
+    bundleLeaders.style.visibility=anchors?.bundleSheath&&la>.001?'visible':'hidden';
 
     // temperature gauge
     const h = local(p, "heat");
