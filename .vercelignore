@@ -1,0 +1,10 @@
+# Vercel builds from the uploaded folder: keep it to what `vite build` needs.
+# Raw downloads (~770 MB, licensed sources), Blender work, docs and local artefacts stay out.
+asset/
+art/
+docs/
+scripts/
+.taste-skill/
+dist/
+node_modules/
+prompt.md
