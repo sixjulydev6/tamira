@@ -244,9 +244,11 @@ class Batch:
 
 # ----------------------------------------------------------------------------- shell
 def build_shell(B):
-    # structural slab under the room and the next slab over it
-    B.box("shell", "concrete_slab", X0 - 0.2, X1, YB - 0.35, YB - 0.03, Z0 - 0.2, Z1)
-    B.box("shell", "concrete_slab", X0 - 0.2, X1, YC + 0.02, YB + FH, Z0 - 0.2, Z1)
+    # structural slab under the room and the next slab over it. Both stop 1 cm short of the
+    # fascia, floor bed and ceiling plaster: the bundle camera sits inside the upper slab, and
+    # coplanar faces there z-fought into a jagged black band (fixed 2026-11-05).
+    B.box("shell", "concrete_slab", X0 - 0.2, X1 - 0.01, YB - 0.35, YB - 0.04, Z0 - 0.2, Z1 - 0.01)
+    B.box("shell", "concrete_slab", X0 - 0.2, X1 - 0.01, YC + 0.03, YB + FH, Z0 - 0.2, Z1 - 0.01)
     B.box("shell", "plaster_ceiling", X0, X1 - 0.12, YC, YC + 0.02, Z0, Z1 - 0.12)
     # shadow gap where the ceiling meets the glazing
     B.box("shell", "frame_dark", X1 - 0.12, X1, YC + 0.005, YC + 0.02, Z0, Z1)
@@ -301,7 +303,7 @@ def build_facade(B):
     B.box("entry", "glass_facade", X1 - 0.05, X1 - 0.038, YB + 0.06, yh - 0.04, Z0, Z1 - 0.05)
     B.box("entry", "glass_facade", X0, X1 - 0.05, YB + 0.06, yh - 0.04, Z1 - 0.05, Z1 - 0.038)
     # sill and head channels
-    for y0, y1 in ((YB, YB + 0.06), (yh - 0.04, yh + 0.02)):
+    for y0, y1 in ((YB, YB + 0.06), (yh - 0.04, yh)):  # head stops under the shadow-gap trim
         B.box("facade", "metal_mullion", X1 - 0.09, X1, y0, y1, Z0, Z1)
         B.box("facade", "metal_mullion", X0, X1 - 0.09, y0, y1, Z1 - 0.09, Z1)
     # mullions
@@ -319,8 +321,8 @@ def build_facade(B):
         B.box("facade", "frame_dark", X1, X1 + 0.06, y0, y1, Z0 - 0.2, Z1 + 0.06)
         B.box("facade", "frame_dark", X0 - 0.2, X1, y0, y1, Z1, Z1 + 0.06)
     # curtain tracks
-    B.box("facade", "metal_white", X1 - 0.36, X1 - 0.3, YC - 0.03, YC, Z0 + 0.1, Z1 - 0.3)
-    B.box("facade", "metal_white", X0 + 0.1, X1 - 0.3, YC - 0.03, YC, Z1 - 0.36, Z1 - 0.3)
+    B.box("facade", "metal_white", X1 - 0.36, X1 - 0.3, YC - 0.035, YC - 0.005, Z0 + 0.1, Z1 - 0.3)
+    B.box("facade", "metal_white", X0 + 0.1, X1 - 0.3, YC - 0.035, YC - 0.005, Z1 - 0.36, Z1 - 0.3)
 
 
 # ----------------------------------------------------------------------------- furniture
