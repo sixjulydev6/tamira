@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FINALE, createFinale, finaleMatrix, finaleRail } from './original/finale.js';
 import { ROOM_VIEW, frameFor, tanRect, windowAt } from './original/roomview.js';
 import { smooth, lerp } from './timeline.js';
+import { Wire } from './wire.js';
 import { originalFinalePath } from './original/camera-path.js';
 
 export { finaleU } from './finale-timing.js';
@@ -27,12 +28,34 @@ export function createFinaleStage(renderer, scene, wire) {
   const camera=new THREE.PerspectiveCamera(28,1,.1,2000);
   const lite=window.matchMedia('(pointer:coarse)').matches||Math.min(innerWidth,innerHeight)<600;
   const set=createFinale(renderer,lite);scene.add(set.group);set.group.visible=false;
-  const curve=new THREE.CatmullRomCurve3(finaleRail('red').map(v=>v.applyMatrix4(M)),false,'centripetal');
-  const length=curve.getLength();
+  const rail=id=>{const c=new THREE.CatmullRomCurve3(finaleRail(id).map(v=>v.applyMatrix4(M)),false,'centripetal');return {curve:c,length:c.getLength()};};
+  const {curve,length}=rail('red');
+  // The neutral and earth: two fresh lengths that slide up the back of the wall into N and E after the
+  // red product wire seats in L, with the source's colours, sheen and timing (script.js finBlack/finGreen).
+  // Same cable model and scale as the red one; hidden until they start to move.
+  const extras=[
+    {id:'black',seat:[6.46,6.58],click:[6.58,6.61],wire:new Wire({color:'#161719',capColor:'#2a2b2e',ink:'rgba(214,214,214,0.42)',envMapIntensity:.5})},
+    {id:'green',seat:[6.54,6.66],click:[6.66,6.69],wire:new Wire({color:'#1a6633',capColor:'#2b7a45',ink:'rgba(226,245,229,0.55)',envMapIntensity:.65})},
+  ].map(e=>({...e,...rail(e.id)}));
+  for(const e of extras){e.wire.group.visible=false;scene.add(e.wire.group);}
+  const SCALE=.16;
+  function poseExtra(e,seat){
+    e.wire.group.visible=seat>.0005;
+    if(!e.wire.group.visible)return;
+    const tip=e.length-(1-seat)*26,tail=tip-30;
+    e.wire.group.scale.setScalar(SCALE);
+    e.wire.setPath(Array.from({length:55},(_,i)=>e.curve.getPointAt(THREE.MathUtils.clamp(lerp(tail,tip,i/54)/e.length,0,1)).divideScalar(SCALE)));
+    Object.assign(e.wire.params,{head:1,strip:FINALE.copper/SCALE,fan:0,glow:0,char:0,cut:0,heat:0});
+    e.wire.update();
+  }
+  // compile their materials now (the stage is built during smoke), so N and E don't stall as they appear
+  for(const e of extras)poseExtra(e,1);
+  renderer.compile(scene,camera);
+  for(const e of extras)e.wire.group.visible=false;
   let blend=0;
   function poseWire(u,startPoints){
     blend=beat(u,6.06,6.32);
-    const scale=lerp(1,.16,blend),seat=1-Math.pow(1-beat(u,6.38,6.5),3);
+    const scale=lerp(1,SCALE,blend),seat=1-Math.pow(1-beat(u,6.38,6.5),3);
     const tip=length-(1-seat)*26,tail=tip-30;
     const start=new THREE.CatmullRomCurve3(startPoints,false,'centripetal');
     wire.group.scale.setScalar(scale);wire.group.visible=true;
@@ -85,17 +108,18 @@ export function createFinaleStage(renderer, scene, wire) {
     camera.setViewOffset(width,height,0,-height*(.06+.02*portrait)*move,width,height);
     camera.updateProjectionMatrix();
     handoff(beat(u,6.9,6.985),aspect);
-    set.update({fade:1,clicks:{red:beat(u,6.5,6.53),black:0,green:0}},camera);
+    set.update({fade:1,clicks:{red:beat(u,6.5,6.53),black:beat(u,...extras[0].click),green:beat(u,...extras[1].click)}},camera);
     poseWire(u,startPoints);
+    for(const e of extras)poseExtra(e,1-Math.pow(1-beat(u,...e.seat),3));
     return {scene,camera};
   }
-  function dispose(){ scene.remove(set.group);set.dispose(); }
-  function hide(){set.group.visible=false;wire.group.scale.setScalar(1);}
+  function dispose(){ scene.remove(set.group);set.dispose();for(const e of extras)scene.remove(e.wire.group); }
+  function hide(){set.group.visible=false;wire.group.scale.setScalar(1);for(const e of extras)e.wire.group.visible=false;}
   return {update,hide,dispose,diagnostics(){
     const {width,height}=lastSize,point=BOARD.clone().project(camera);
     const g=ROOM_VIEW[frameFor(width/height)],win=windowAt(g,0,width/height);
     const actual=[(point.x*.5+.5)*width,(-point.y*.5+.5)*height];
     const expected=[(g.board.centre[0]-win.x0)/win.w*width,(g.board.centre[1]-win.y0)/win.h*height];
-    return {boardVisible:set.group.visible,connectionWires:1,wireId:wire.group.uuid,blend,boardActual:actual,boardExpected:expected,boardErrorPx:Math.hypot(actual[0]-expected[0],actual[1]-expected[1])};
+    return {boardVisible:set.group.visible,connectionWires:1+extras.filter(e=>e.wire.group.visible).length,wireId:wire.group.uuid,blend,boardActual:actual,boardExpected:expected,boardErrorPx:Math.hypot(actual[0]-expected[0],actual[1]-expected[1])};
   }};
 }

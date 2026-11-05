@@ -1,3 +1,5 @@
+> Historical clay-art production brief, preserved for material references and reproducible offline work. Current runtime direction supersedes its raster-first delivery plan: the city, rise and traffic are procedural Three.js driven by GSAP; opening imagery is fallback only. The accepted ending reuses the original rendered room, with the same single red wire connecting at the rear board and the original three-wire camera/red insertion timing. Do not rebuild the whole site from this older plan. Use Comet for browser review. Read [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md) before implementation; post-fix board visual verification remains open.
+
 # Tamira city hero — production prompt and implementation plan
 
 ## Task and scope

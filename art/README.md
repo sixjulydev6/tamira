@@ -2,7 +2,7 @@
 
 # Hero art pipeline
 
-The day city hero (`public/media/hero-city-*`) is a Cycles render from one script. It replaces the
+The offline day city reference (`public/media/hero-city-*`) is a Cycles render from one script. Normal interactive browsing uses live Three.js geometry instead. It replaces the
 earlier `hero-day.jpg`, keeping its layout and camera but with a different finish: satin
 ceramic instead of soft and foggy (brief: `prompt.md`).
 
@@ -97,3 +97,59 @@ blender.exe -b --python animate_city.py -- <out> 16 1600 risewebp      # → ris
   street-level horizon is white sky; nothing inside the isometric frame changes.
 - Site files: `rise_webp\r_*.webp` → `public/media/rise/`; `riseposter_webp\r_0000.webp` → `public/media/hero-rise-3840.webp`
   (and a 1920 copy, `hero-rise-1920.webp`).
+
+## Current site handoff (2026-11-04)
+
+`art/data/city-layout.json` is shared with `src/story/daylight.js`; synchronize geometry/layout changes with the wireframe. Historical traffic/rise render commands above are offline reproduction tools, not steps required to run the site. The opening transparent still remains first-paint/static fallback; old sequences/videos remain on disk pending reviewed asset cleanup.
+
+The ending uses the source repository's unchanged room WebPs in `public/room/`, not a new Blender render. Only the same red product wire connects; retain the original camera/red insertion timing. Use Comet for browser review and do not treat the pending rear-board check as passed. Pushed implementation `6d33386`, branch `bishwa-wire-v1`. Latest context: [docs/CURRENT-CONTEXT.md](../docs/CURRENT-CONTEXT.md).
+
+## The living room (room finale images)
+
+`blender/build_room.py` rebuilds the end-of-story living room with realistic materials on exactly the cameras and crops in `src/story/room.json` (embedded when sent to the team machine). It covers 2 frames (d, p) × 4 zoom levels × 6 cumulative lighting steps = 48 PNGs. Step *s* switches on the first *s* light groups (downlights, pendant, sconces, arc lamp, TV-unit strip) and flips rockers 0…s−1 with glowing dots. CC0 Poly Haven assets download once into `source\polyhaven`.
+
+```
+set TAMIRA_GPU=1   (omit to render on 20 CPU threads; the team GPU may be busy with Unreal)
+blender.exe -b --factory-startup --python blender\room\build_room.py -- renders\room check 16 d-l0-5      # alignment (board px error per level) + room.blend
+blender.exe -b --factory-startup --python blender\room\build_room.py -- renders\room preview 128 d-l0-5  # 50% previews
+blender.exe -b --factory-startup --python blender\room\build_room.py -- renders\room final 192 all       # 48 frames, ~31 min on the RTX 3060 (resumable)
+```
+
+Then, on the Mac, `finish_room.py` adds the painter's soft edges to levels 1–3 (smoothstep over 7% on sides inside the frame, matching `roompaint.js` EDGE) and writes `public/room/*.webp`:
+
+```
+Blender -b --factory-startup --python art/blender/finish_room.py -- <map.json> public/room
+```
+
+The 1000×2174 portrait close-ups exceed the MCP `look` limit, so they come over as two halves (`split_tall.py` on the team machine) and are stitched losslessly. Check afterwards with `scripts/verify-room-finale.mjs` (board error, lighting steps) and in Comet.
+
+## The living room as a live GLB (lab)
+
+```
+TAMIRA_ROOT=<work> Blender -b --factory-startup --python art/blender/build_room.py -- <work>/out check 16 d-l0-5
+Blender -b --factory-startup <work>/out/room.blend --python art/blender/export_room_glb.py -- public/room-3d <work>/source/polyhaven
+```
+
+Open `/room-lab.html` on the dev server. Keep the `PBR` table in `export_room_glb.py` in step with `build()` in `build_room.py`.
+
+## Room lightmaps (team GPU)
+
+Bake on the Windows RTX 3060 so the UVs, GLB and maps come from one session. The scripts are sent to `blender\room\` as a zip payload:
+
+```
+set TAMIRA_GPU=1
+blender.exe -b --factory-startup --python build_room.py -- <o>\scene check 16 d-l0-5
+blender.exe -b --factory-startup <o>\scene\room.blend --python export_room_glb.py -- <o>\out_glb <root>\source\polyhaven lm
+blender.exe -b --factory-startup <o>\out_glb\web.blend --python bake_room_lightmaps.py -- <o>\out_glb 2048 1024    # ~24 min
+blender.exe -b --factory-startup --python data_png.py -- pack <o>\xfer <o>\out_glb\room.glb <o>\out_glb\room-lights.json <o>\out_glb\lm\*.hdr
+```
+
+Bring the `data-*.png` over with MCP `look`, then on the Mac:
+
+```
+Blender -b --factory-startup --python art/tools/data_png.py -- unpack <in> data-000.png …       # verifies sha256
+Blender -b --factory-startup --python art/tools/denoise_lightmaps.py -- <dn> <in>/lm-*.hdr       # OIDN, HDR
+Blender -b --factory-startup --python art/tools/encode_lightmaps.py -- public/room-3d/lm <dn>/lm-*.hdr   # RGBM WebP
+```
+
+Then copy `room.glb` and `room-lights.json` into `public/room-3d/`. Pitfall: an 8-bit save from a *float* Blender image bakes in an sRGB curve; the encoder uses byte buffers.

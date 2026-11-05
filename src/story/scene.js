@@ -76,7 +76,12 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   const cityWireScene = new THREE.Scene();
   cityWireScene.environment = environmentFor(renderer);
   cityWireScene.environmentIntensity = 0.85;
-  cityWireScene.environmentRotation.setFromRotationMatrix(new THREE.Matrix4().set(0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+  // The lookup must take city directions to product directions (city X,Y,Z → product z,x,y). three.js
+  // negates the Euler angles before building the shader's lookup matrix, so the angles are given here
+  // already negated. (Setting them from that matrix directly turned the room environment upside down
+  // on the city wire: city up looked up the product floor, lighting the jacket from below.)
+  { const lookup = new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().set(0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+    cityWireScene.environmentRotation.set(-lookup.x, -lookup.y, -lookup.z, lookup.order); }
   { const k = new THREE.DirectionalLight(0xffffff, 2.2); k.position.set(12, -6, 10); cityWireScene.add(k);
     const r = new THREE.DirectionalLight(0xdfe6ff, 1.1); r.position.set(-6, 8, -4); cityWireScene.add(r); }
   const cityWire = new Wire();
@@ -114,7 +119,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     const tip = shapeWorld.entry[5];
     return new THREE.Vector3(AVENUE.x + v.z * CITY_SCALE, HEAD_Y + (v.x - tip.x) * CITY_SCALE, (v.y + halfH + 1) * CITY_SCALE);
   };
-  let cityPathLifted = [], cityPathFlat = [];
+  let cityPathLifted = [], cityPathFlat = [], cityPathHand = [], entryLength = 1;
 
   function resize() {
     const r = canvas.getBoundingClientRect();
@@ -153,6 +158,13 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     const lead = [HEAD_Y - 1700, HEAD_Y - 900, HEAD_Y - 160].map((y) => new THREE.Vector3(AVENUE.x, y, R));
     cityPathLifted = [...lead, ...lifted];
     cityPathFlat = cityPathLifted.map((v) => new THREE.Vector3(AVENUE.x, v.y, R));
+    // ...and, for the end of the drain (the city already gone), exactly the product wire's path: the
+    // whole entry shape, with its tail continued along the curve's own end tangent. The first ghost
+    // point is the one CatmullRomCurve3 uses for an open end (2·p0 − p1), so every visible segment is
+    // computed from the same four points as the product wire's.
+    const e = shapeWorld.entry, g1 = e[0].clone().multiplyScalar(2).sub(e[1]), g0 = g1.clone().multiplyScalar(2).sub(e[0]);
+    cityPathHand = [g0, g1, ...e].map(toCity);
+    entryLength = new THREE.CatmullRomCurve3(e, false, "centripetal", 0.5).getLength();
   }
 
   /* ---------------------------------------------------------------- city camera
@@ -216,14 +228,17 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   function cityWireState(p) {
     // the tip lifts into the product shape over the second half of the push-in
     const lift = smooth(0.6, 1, approachK(p));    // lifts only once the city is going
-    const pts = cityPathFlat.map((v, i) => v.clone().lerp(cityPathLifted[i], lift).divideScalar(CITY_SCALE));
+    // after the city has faded (drain 0.28), the tail, tail length and strand glow settle onto the
+    // product wire's, so the hand-over shows one identical wire
+    const hand = smooth(0.3, 0.95, local(p, "drain"));
+    const pts = cityPathFlat.map((v, i) => v.clone().lerp(cityPathLifted[i], lift).lerp(cityPathHand[i], hand).divideScalar(CITY_SCALE));
     cityWire.setPath(pts, FACING_X);
     const P = cityWire.params;
     // tip travels from off-screen (900 m back) to HEAD_Y along the straight avenue
     const back = (1 - smooth(0.04, 0.92, local(p, "run"))) * 900 / CITY_SCALE;
     P.head = Math.max(0.02, (cityWire.length - back) / cityWire.length);
-    P.tailLen = 340;
-    P.strip = 3.4; P.fan = 0.45; P.glow = 1; P.cut = 0; P.heat = 0; P.char = 0;
+    P.tailLen = lerp(340, entryLength + 30, hand);   // the product wire's tail: 30 past its first point
+    P.strip = 3.4; P.fan = 0.45; P.glow = 1 - hand; P.cut = 0; P.heat = 0; P.char = 0;
     cityWire.update();
     const tip = cityWire.frameAt(cityWire.headDist, { p: new THREE.Vector3(), t: new THREE.Vector3(), n: new THREE.Vector3(), b: new THREE.Vector3() }).p;
     return tip.multiplyScalar(CITY_SCALE);
@@ -247,7 +262,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
 
     // the wire is already in place: it arrived through the city
     P.head = 1;
-    P.glow = lerp(1, 0.25, smooth(0.2, 1, L("wireIn"))) * (1 - smooth(0, 0.5, L("copper")));
+    P.glow = 0;   // the ember has cooled in the city wire before the hand-over (cityWireState)
     P.strip = 3.4;
     // strands open up for copper, gather again for the bend, and are tidy when the wire is connected
     P.fan = lerp(0.45, 1, smooth(0.1, 0.6, L("copper"))) * (1 - 0.35 * toElbow) * (1 - 0.8 * toFinale);

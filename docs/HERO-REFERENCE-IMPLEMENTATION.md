@@ -1,3 +1,5 @@
+> Historical implementation record (2026-11-04). The incident.io measurement pass preceded the full-bleed street-level crown hero and live Three.js rise. Its framed-media composition, centered supporting-copy metrics and Quicksand wordmark references are superseded. Current headings use Geist Serif, body uses Instrument Sans and the logo is the supplied SVG. Use Comet for further browser review. Latest implementation, single-wire finale and verification limits: [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md).
+
 # Incident.io hero layout implementation
 
 Reference: https://incident.io/ — inspected November 4, 2026.

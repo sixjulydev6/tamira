@@ -2,6 +2,12 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SEGMENTS, TOTAL_SCREENS, local, smooth, windowed, lerp, progressOf } from "./story/timeline.js";
 import { createRoom } from "./story/room.js";
+import { createLiveRoom } from "./story/room-live.js";
+
+// The room at the end: the 48 rendered images on every device (user direction, DECISIONS 34: the live
+// GLB room was breaking). ?room=glb opens the GLB room on desktop for development only.
+const PHONE = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 900;
+const ROOM_MODE = !PHONE && new URLSearchParams(location.search).get("room") === "glb" ? "glb" : "images";
 import { finaleU } from "./story/finale-timing.js";
 import { pageColors } from "./story/palette.js";
 import { CHAPTERS, LABELS, GAUGE } from "./story/chapters.js";
@@ -50,16 +56,12 @@ for (const t of document.querySelectorAll(".gauge__tick"))
 
 /* ------------------------------------------------------------------ static fallback (reduced motion, or no WebGL) */
 const storyEl = document.querySelector(".story");
-let staticResize = null;
 function goStatic() {
-  if (staticResize) window.removeEventListener("resize", staticResize);
   storyEl.classList.add("is-static");
   root.classList.add("is-static");
-  const copy = document.querySelector(".hero__copy");
-  const fit = () => { if (storyEl.classList.contains("is-static")) root.style.setProperty("--hero-copy-h", `${copy.offsetHeight}px`); };
-  staticResize = fit;
-  fit(); window.addEventListener("resize", fit); document.fonts?.ready.then(fit);
   root.style.removeProperty("--story-screens");
+  const stage = document.querySelector(".story__stage");
+  stage.style.clipPath = ""; stage.style.removeProperty("--sky");
   for (const selector of [".hero__stage", ".hero__rise", ".hero__copy"]) {
     const el = document.querySelector(selector); el.style.opacity = "1"; el.style.visibility = "visible"; el.style.translate = "";
   }
@@ -68,7 +70,7 @@ function goStatic() {
 
 const motion = gsap.matchMedia();
 motion.add({ animate: "(prefers-reduced-motion: no-preference)", reduce: "(prefers-reduced-motion: reduce)" }, context => {
-  if (context.conditions.reduce) { goStatic(); return () => { window.removeEventListener("resize", staticResize); staticResize = null; }; }
+  if (context.conditions.reduce) { goStatic(); return; }
   return runStory();
 });
 if (import.meta.hot) import.meta.hot.dispose(() => motion.revert());
@@ -77,13 +79,15 @@ function runStory() {
   root.classList.remove("is-static"); storyEl.classList.remove("is-static");
   root.style.setProperty("--story-screens", String(TOTAL_SCREENS + 1));
   let disposed = false;
-  const room = createRoom(document.querySelector(".room-finale"));
+  const room = (ROOM_MODE === "glb" ? createLiveRoom : createRoom)(document.querySelector(".room-finale"));
 
-  /* page-load moment (once) */
-  gsap.timeline({ defaults: { ease: "expo.out" } })
-    .from(".site-header", { autoAlpha: 0, y: -8, duration: 0.6 })
-    .from(".hero__title .line__inner", { yPercent: 105, duration: 1.0, stagger: 0.1 }, 0.1)
-    .from(".hero__lede, .hero__cta", { autoAlpha: 0, y: 16, duration: 0.8, stagger: 0.08 }, 0.3)
+  /* page-load moment (once), timed as the reference: masked lines rise 110% over 0.8s with a 0.05s
+     stagger, the sentence with them; the action pops in from 0.4s */
+  gsap.timeline({ defaults: { ease: "power2.out" } })
+    .from(".site-header", { autoAlpha: 0, y: -8, duration: 0.6 }, 0)
+    .from(".hero__title .line__inner", { yPercent: 110, duration: 0.8, stagger: 0.05 }, 0)
+    .from(".hero__lede", { autoAlpha: 0, y: 24, duration: 0.8 }, 0)
+    .from(".hero__cta", { autoAlpha: 0, y: 20, scale: 0.9, duration: 0.6, ease: "back.out(1.7)" }, 0.4)
     .from(".hero__rise", { opacity: 0, duration: 1.2, ease: "power2.out" }, 0.15);   // opacity only (render() owns its visibility); not the stage, whose opacity would lift the headline over the tower
 
   /* Live street-level city → isometric daylight → wireframe; stills are fallbacks only. */
@@ -92,6 +96,18 @@ function runStory() {
   const riseLayer = document.querySelector(".hero__rise");
   const heroStage = document.querySelector(".hero__stage");
   const heroCopy = document.querySelector(".hero__copy");
+  // the lift is applied to the headline and the bottom row, not their wrapper: opacity/translate on
+  // the wrapper would flatten them into one layer under the city canvas (the sentence must stay above it)
+  const heroParts = [".hero__title", ".hero__haze", ".hero__aside"].map((q) => document.querySelector(q));
+  const storyStage = document.querySelector(".story__stage");
+  let frameInset = 12, frameRadius = 20;
+  const measureFrame = () => {
+    const cs = getComputedStyle(storyStage);
+    frameInset = parseFloat(cs.getPropertyValue("--frame-inset")) || 0;
+    frameRadius = parseFloat(cs.getPropertyValue("--frame-radius")) || 0;
+  };
+  measureFrame();
+  let lastClip = "";
   const canvas = document.querySelector(".story__canvas");
   const wireCanvas = document.querySelector(".story__canvas--wire");
   const themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -134,11 +150,19 @@ function runStory() {
 
     // the copy lifts away, and the camera rises from street level to the isometric view
     const rise = local(p, "rise");
+    // the hero frame opens to the full screen as the rise begins; the sky tint gives way to the page
+    // colour before the wireframe, so the hand-over meets the same full-screen frame as before
+    const u = 1 - smooth(0, 0.35, rise);
+    const clip = u > 0 ? `inset(${(frameInset * u).toFixed(2)}px round ${(frameRadius * u).toFixed(2)}px)` : "none";
+    if (clip !== lastClip) { storyStage.style.clipPath = clip; lastClip = clip; }
+    storyStage.style.setProperty("--sky", (1 - smooth(0.55, 0.95, rise)).toFixed(3));
     riseLayer.style.visibility = story ? "hidden" : "visible";
     isoLayer.style.opacity = "0";
     const lift = smooth(0.0, 0.2, rise);
-    heroCopy.style.opacity = String(1 - lift);
-    heroCopy.style.translate = `0 ${(-lift * 24).toFixed(1)}px`;
+    for (const el of heroParts) {
+      el.style.opacity = lift > 0 ? String(1 - lift) : "";
+      el.style.translate = lift > 0 ? `0 ${(-lift * 24).toFixed(1)}px` : "";
+    }
     heroCopy.style.visibility = lift >= 1 ? "hidden" : "";
 
     // the day render hands over to the 3D wireframe: the canvas (page colour + lines drawn exactly on
@@ -199,7 +223,7 @@ function runStory() {
     elapsed += segment.screens;
     master.to(state, { p: elapsed / TOTAL_SCREENS, duration: segment.screens });
   }
-  const resize = () => { story?.resize(); render(state.p); };
+  const resize = () => { measureFrame(); lastClip = ""; story?.resize(); render(state.p); };
   window.addEventListener("resize", resize);
   document.fonts.ready.then(() => { if (!disposed) { resize(); ScrollTrigger.refresh(); } });
   const lost = event => { event.preventDefault(); storyEl.classList.remove("is-live-3d"); master.scrollTrigger?.kill(); master.pause(); goStatic(); };
@@ -227,7 +251,6 @@ function runStory() {
   }
   return () => {
     disposed = true;
-    if (staticResize) { window.removeEventListener("resize", staticResize); staticResize = null; }
     gsap.ticker.remove(animateTraffic);
     window.removeEventListener("resize", resize);
     canvas.removeEventListener("webglcontextlost", lost); wireCanvas.removeEventListener("webglcontextlost", lost);
@@ -235,7 +258,9 @@ function runStory() {
     storyEl.classList.remove("is-live-3d");
     canvas.style.opacity = "0"; wireCanvas.style.opacity = "0";
     riseLayer.style.visibility = ""; isoLayer.style.opacity = "";
-    heroCopy.style.opacity = ""; heroCopy.style.visibility = ""; heroCopy.style.translate = "";
+    heroCopy.style.visibility = "";
+    for (const el of heroParts) { el.style.opacity = ""; el.style.translate = ""; }
+    storyStage.style.clipPath = ""; storyStage.style.removeProperty("--sky");
     if (import.meta.env.DEV) delete window.__tamira;
   };
 

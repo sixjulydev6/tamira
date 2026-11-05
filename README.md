@@ -10,7 +10,7 @@ The homepage is a single scroll-driven story.
 2. A red single-core **house wire** runs along an avenue through it. The street lights and buildings light up behind its tip as it passes.
 3. The camera pushes in on the wire, the city drains away into its tip, and the page turns light.
 4. The same wire tells the product story: copper, strands, flex, heat, flame and smoke.
-5. Three wires seat in the original five-switch board; the camera travels into the original living room and its five lighting groups switch on. See [docs/ROOM-FINALE.md](docs/ROOM-FINALE.md).
+5. The same red wire seats in the back of the original five-switch board, then black and green follow it into N and E, using the source camera movement and insertion timing without a canvas fade; the camera travels into the original living room and its five lighting groups switch on. See [docs/ROOM-FINALE.md](docs/ROOM-FINALE.md).
 
 The other site sections (Consumers, Industries, Investors, Company) come in a later stage.
 
@@ -42,10 +42,15 @@ The site is plain HTML, CSS and JavaScript, with no framework. Versions are pinn
 Three.js and the story scene are lazy-loaded after first paint. The city, camera rise, moving traffic, wireframe and product interactions are now live Three.js geometry controlled by GSAP. One transparent opening still remains for first paint and fallback; no rendered rise sequence or traffic video is requested. The ending deliberately uses the original rendered room images for an exact room match. See [docs/LIVE-3D.md](docs/LIVE-3D.md) for implementation and checks. The older Blender sources and renders remain in `art/` and `public/media/` as references.
 
 
+## Current handoff
+
+Implementation commit [`6d33386`](https://github.com/akhil515435-design/tamira-site/commit/6d33386) is pushed to `bishwa-wire-v1`. Use **Comet** for browser review. The board visibility regression is fixed in code; post-fix visual review remains outstanding after Comet tool timeouts. Earlier camera-alignment tests did not detect that hidden-board bug. See [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md) for the complete state and verification limits.
+
 ## Documentation
 
 | Doc | Read it for |
 |---|---|
+| [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md) | Latest accepted direction, delivery state, verification limits and next review |
 | [docs/STORY.md](docs/STORY.md) | The scroll story beat by beat: what happens, where it happens in the scroll, and the knobs to retune it |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the code is organised, the render pipeline, the city-to-product hand-over, and how to add or change things |
 | [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md) | Grid, type scale, colours, composition rules and motion rules |

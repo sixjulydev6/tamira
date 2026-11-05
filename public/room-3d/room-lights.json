@@ -1,0 +1,520 @@
+{
+ "lights": [
+  {
+   "name": "led_area",
+   "group": 5,
+   "type": "AREA",
+   "watts": 55.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    1.809999942779541,
+    0.1899999976158142,
+    -2.7850000858306885
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "size": [
+    0.029999999329447746,
+    2.509999990463257
+   ]
+  },
+  {
+   "name": "downlight",
+   "group": 1,
+   "type": "SPOT",
+   "watts": 32.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -1.0,
+    2.73799991607666,
+    -0.30000001192092896
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.9599310755729675,
+   "blend": 0.8999999761581421,
+   "radius": 0.03500000014901161
+  },
+  {
+   "name": "downlight.001",
+   "group": 1,
+   "type": "SPOT",
+   "watts": 32.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -1.0,
+    2.73799991607666,
+    -2.240000009536743
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.9599310755729675,
+   "blend": 0.8999999761581421,
+   "radius": 0.03500000014901161
+  },
+  {
+   "name": "downlight.002",
+   "group": 1,
+   "type": "SPOT",
+   "watts": 32.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -1.0,
+    2.73799991607666,
+    -4.170000076293945
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.9599310755729675,
+   "blend": 0.8999999761581421,
+   "radius": 0.03500000014901161
+  },
+  {
+   "name": "downlight.003",
+   "group": 1,
+   "type": "SPOT",
+   "watts": 32.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    1.0,
+    2.73799991607666,
+    -0.30000001192092896
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.9599310755729675,
+   "blend": 0.8999999761581421,
+   "radius": 0.03500000014901161
+  },
+  {
+   "name": "downlight.004",
+   "group": 1,
+   "type": "SPOT",
+   "watts": 32.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    1.0,
+    2.73799991607666,
+    -2.240000009536743
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.9599310755729675,
+   "blend": 0.8999999761581421,
+   "radius": 0.03500000014901161
+  },
+  {
+   "name": "downlight.005",
+   "group": 1,
+   "type": "SPOT",
+   "watts": 32.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    1.0,
+    2.73799991607666,
+    -4.170000076293945
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.9599310755729675,
+   "blend": 0.8999999761581421,
+   "radius": 0.03500000014901161
+  },
+  {
+   "name": "pendant_bulb",
+   "group": 2,
+   "type": "POINT",
+   "watts": 45.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -0.3199999928474426,
+    1.9800000190734863,
+    -2.5999999046325684
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "radius": 0.05999999865889549
+  },
+  {
+   "name": "pendant_down",
+   "group": 2,
+   "type": "SPOT",
+   "watts": 30.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -0.3199999928474426,
+    1.8799999952316284,
+    -2.5999999046325684
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 1.0471975803375244,
+   "blend": 1.0,
+   "radius": 0.20000000298023224
+  },
+  {
+   "name": "sconce_up",
+   "group": 3,
+   "type": "SPOT",
+   "watts": 14.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -1.815000057220459,
+    1.7300000190734863,
+    -3.4700000286102295
+   ],
+   "direction": [
+    0.0,
+    1.0,
+    8.742277657347586e-08
+   ],
+   "angle": 0.6544984579086304,
+   "blend": 0.800000011920929,
+   "radius": 0.029999999329447746
+  },
+  {
+   "name": "sconce_down",
+   "group": 3,
+   "type": "SPOT",
+   "watts": 14.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -1.815000057220459,
+    1.6100000143051147,
+    -3.4700000286102295
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.6544984579086304,
+   "blend": 0.800000011920929,
+   "radius": 0.029999999329447746
+  },
+  {
+   "name": "sconce_core",
+   "group": 3,
+   "type": "POINT",
+   "watts": 4.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -1.815000057220459,
+    1.6699999570846558,
+    -3.4700000286102295
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "radius": 0.029999999329447746
+  },
+  {
+   "name": "sconce_up.001",
+   "group": 3,
+   "type": "SPOT",
+   "watts": 14.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    1.784999966621399,
+    1.7100000381469727,
+    -4.340000152587891
+   ],
+   "direction": [
+    0.0,
+    1.0,
+    8.742277657347586e-08
+   ],
+   "angle": 0.6544984579086304,
+   "blend": 0.800000011920929,
+   "radius": 0.029999999329447746
+  },
+  {
+   "name": "sconce_down.001",
+   "group": 3,
+   "type": "SPOT",
+   "watts": 14.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    1.784999966621399,
+    1.590000033378601,
+    -4.340000152587891
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.6544984579086304,
+   "blend": 0.800000011920929,
+   "radius": 0.029999999329447746
+  },
+  {
+   "name": "sconce_core.001",
+   "group": 3,
+   "type": "POINT",
+   "watts": 4.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    1.784999966621399,
+    1.649999976158142,
+    -4.340000152587891
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "radius": 0.029999999329447746
+  },
+  {
+   "name": "arc_bulb",
+   "group": 4,
+   "type": "POINT",
+   "watts": 30.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -0.550000011920929,
+    1.7000000476837158,
+    -2.9700000286102295
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "radius": 0.05000000074505806
+  },
+  {
+   "name": "arc_down",
+   "group": 4,
+   "type": "SPOT",
+   "watts": 22.0,
+   "color": [
+    1.0,
+    0.4407467246055603,
+    0.1557118147611618
+   ],
+   "position": [
+    -0.550000011920929,
+    1.6200000047683716,
+    -2.9700000286102295
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "angle": 0.9599310755729675,
+   "blend": 1.0,
+   "radius": 0.15000000596046448
+  }
+ ],
+ "emissive": {
+  "downlight_lens": 1,
+  "pendant_diffuser": 2,
+  "sconce_glass": 3,
+  "arc_diffuser": 4,
+  "led_strip": 5
+ },
+ "textures": {
+  "wall_plaster": {
+   "files": {
+    "map": "wall_plaster_col.jpg",
+    "normalMap": "wall_plaster_nor.webp",
+    "roughnessMap": "wall_plaster_rgh.webp"
+   },
+   "size": [
+    2.0,
+    2.0
+   ]
+  },
+  "ceiling_plaster": {
+   "files": {
+    "map": "ceiling_plaster_col.jpg",
+    "normalMap": "ceiling_plaster_nor.webp",
+    "roughnessMap": "ceiling_plaster_rgh.webp"
+   },
+   "size": [
+    2.0,
+    2.0
+   ]
+  },
+  "floor_oak": {
+   "files": {
+    "map": "floor_oak_col.jpg",
+    "normalMap": "floor_oak_nor.webp",
+    "roughnessMap": "floor_oak_rgh.webp"
+   },
+   "size": [
+    1.6999999284744263,
+    1.7000000476837158
+   ]
+  },
+  "oak_veneer": {
+   "files": {
+    "map": "oak_veneer_col.jpg",
+    "normalMap": "oak_veneer_nor.webp",
+    "roughnessMap": "oak_veneer_rgh.webp"
+   },
+   "size": [
+    0.9150000214576721,
+    0.9150000214576721
+   ]
+  },
+  "sofa_linen": {
+   "files": {
+    "map": "sofa_linen_col.jpg",
+    "normalMap": "sofa_linen_nor.webp",
+    "roughnessMap": "sofa_linen_rgh.webp"
+   },
+   "size": [
+    0.09474784874368201,
+    0.09495499581098556
+   ]
+  },
+  "rug_wool": {
+   "files": {
+    "map": "rug_wool_col.jpg",
+    "normalMap": "rug_wool_nor.webp",
+    "roughnessMap": "rug_wool_rgh.webp"
+   },
+   "size": [
+    0.13503942743366965,
+    0.13785000145435333
+   ]
+  },
+  "throw_waffle": {
+   "files": {
+    "map": "throw_waffle_col.jpg",
+    "normalMap": "throw_waffle_nor.webp",
+    "roughnessMap": "throw_waffle_rgh.webp"
+   },
+   "size": [
+    0.11231487068730961,
+    0.11072000265121461
+   ]
+  }
+ },
+ "tree": {
+  "image": "tree_cutout.png",
+  "size": [
+   11.004531860351562,
+   6.495617866516113
+  ]
+ },
+ "baked": [
+  "arc_base",
+  "arc_shade",
+  "art_mat",
+  "art_print",
+  "black_metal",
+  "ceiling",
+  "chair_throw",
+  "dark_glaze",
+  "downlight_trim",
+  "floor",
+  "oak_veneer",
+  "pendant_shade",
+  "rug",
+  "skirting",
+  "sofa_linen",
+  "switch_plate",
+  "tv_body",
+  "wall_plaster",
+  "window_frame"
+ ],
+ "note": "Blender (x,y,z) -> glTF (x,z,-y). Rocker pivots rotate about glTF -Z (Blender +Y)."
+}

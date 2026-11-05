@@ -1,0 +1,34 @@
+{
+ "size": 2048,
+ "samples": 1024,
+ "groups": {
+  "0": {
+   "seconds": 279.3,
+   "bytes": 9457358
+  },
+  "1": {
+   "seconds": 245.9,
+   "bytes": 9119625
+  },
+  "2": {
+   "seconds": 228.5,
+   "bytes": 9432220
+  },
+  "3": {
+   "seconds": 250.2,
+   "bytes": 8910215
+  },
+  "4": {
+   "seconds": 227.4,
+   "bytes": 9719848
+  },
+  "5": {
+   "seconds": 238.5,
+   "bytes": 9297297
+  }
+ },
+ "passes": {
+  "0": "direct+indirect (sky)",
+  "1-5": "indirect"
+ }
+}

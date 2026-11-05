@@ -1,7 +1,3 @@
-> **Room ending:** `finale-stage.js` reuses the product renderer for the original three-wire switchboard. `room.js` paints the original desktop/portrait room images on a separate 2D canvas using the shared GSAP clock. See [ROOM-FINALE.md](ROOM-FINALE.md) for provenance and alignment.
-
-> **Current runtime:** daylight city and rise are now live Three.js; `daylight.js` shares the city renderer and a labeled GSAP timeline replaces raster frame scrubbing. See [LIVE-3D.md](LIVE-3D.md) for the current asset, camera, lifecycle and validation details. Older rendered-hero sections below are historical implementation context.
-
 # Architecture
 
 ## Files
@@ -17,12 +13,18 @@ src/story/
   chapters.js              chapter copy, pinned label text, gauge values
   scene.js                 createStory(): renderers, city camera, city wire, product wire, per-chapter
                            choreography, label anchors, the hand-over mapping
+  daylight.js              live PBR city, camera rise, traffic and shadow lifecycle
+  finale-stage.js          shared product cable/scene adapter, original camera, rear board, room frustum
+  finale-timing.js         source-unit clock shared by finale and room
+  room.js / room.json      room painter lifecycle and original camera/board metadata
+  original/                adapted source finale, surface, camera table and room helpers
   city.js                  the wireframe city: port of hero_day.py, extended city, avenue, street lights,
                            all city shaders (lines, hulls, lamps, building lights)
   wire.js                  Wire class: procedural single-core wire (jacket + 30 strands) bent onto a path
   props.js                 conduit, heater, flame, smoke puffs, wall switch plate (procedural)
-public/media/hero-city-*   the day render, 16:9, 1920, 2560 and 3840 wide (AVIF / WebP / JPG), the hero image
-public/media/hero-traffic-2560.{webm,mp4}   the traffic loop over it (AV1 / H.264); frame 0 = hero-city
+public/media/hero-city-*   retained offline art/reference renders, not the normal live city
+public/media/hero-traffic-2560.{webm,mp4}   retained offline traffic references; not requested by the live story
+public/room/               original 48 room WebPs (Canvas2D ending)
 art/                       the hero's Blender source, layout manifest and checks (art/README.md)
 ```
 
@@ -30,15 +32,12 @@ art/                       the hero's Blender source, layout manifest and checks
 
 There is one `<section class="story">`, `(TOTAL_SCREENS + 1) × 100svh` tall. Inside it, `.story__stage` is `position: sticky`, 100svh tall. Its layers, bottom to top:
 
-1. `.hero__stage`: the hero city, full screen, with **no stacking context** (no z-index, clip, transform or opacity on it), so the headline can sit between its two layers:
-   - `.hero__iso` (bottom): the isometric day image (`<picture>` → `img.hero__poster`, cover, 50% 58%) and `video.hero__video` (the traffic loop). Opacity 0 until the rise lands on it (95–100% of `rise`). `setTraffic` plays the video while `rise >= 1 && wireOn < 1`. Every source must stay 16:9: scene.js's `resize()` fits the camera to the poster's `object-fit: cover` frame using `VIDEO_W/H` (1920×1080).
-   - `.hero__rise` (z 2, above the headline): `img.hero__opening` (the street-level still, alpha) and `canvas.hero__seq` (the rise frames). `layoutRise()` sizes this layer to the 16:9 cover box (so its crop matches every other layer) and, on phones, `setRiseFit()` shrinks it to a skyline at the bottom and grows it back during the rise. `drawRise()` draws frame ⌊f⌋ and crossfades ⌊f⌋+1. Hidden once `rise >= 1`. The page-load fade animates its opacity only (render() owns its visibility).
-2. `canvas.story__canvas`: the **city** renderer (wireframe city, street lights, city wire).
-3. `canvas.story__canvas--wire`: the **product wire** renderer (chapters).
-4. `.hero__copy` (no z-index): `.hero__title` (z 1, between the isometric and street-level layers) and `.hero__aside` (z 3: sentence + button; left column from 1024px, centred under the headline on phones). Fades out over 0–20% of `rise`.
-5. `.story__copy`: one `<article class="chapter">` per chapter (built from `chapters.js`).
-6. `.story__labels`: the three pinned labels for the strands chapter.
-7. `.gauge`: the temperature gauge for the heat chapter.
+1. `.hero__stage`: first-paint/static fallback imagery; old rendered rise/video playback is inactive.
+2. `canvas.story__canvas`: shared daylight/rise/wireframe city renderer and city-wire overlay.
+3. `canvas.story__canvas--wire`: product chapters plus the same-scene three-wire switchboard finale (red is the product wire).
+4. Hero typography/aside layered around the crown city as the current hero composition requires.
+5. `.room-finale`: Canvas2D original room painter, shown after a decoded frame exists and after matched board-camera alignment.
+6. Chapter copy, pinned strand labels and heat gauge above the visuals.
 
 ## Control flow
 
@@ -55,10 +54,20 @@ main.js render(p)
   └─ gauge value
 ```
 
-- **`render(p)` is pure.** It reads only `p`, and the 3D renders on demand inside `story.update`. There is no animation loop.
+- **Story state is derived from progress.** Camera, geometry and chapter state seek/reverse deterministically. A GSAP ticker advances daylight traffic while visible and allows room repaints after asynchronous image decode. Resource loading and rendering have lifecycle state; do not describe the entire renderer as a pure function.
 - **Segment-local progress.** `local(p, "run")` gives 0–1 progress inside a segment. `smooth(a, b, x)` and `windowed(x, a, b, c, d)` shape the in/out timing.
 - **Lazy loading.** `scene.js` is imported with `import()` after first paint (`requestIdleCallback`). Until it loads, `render` still runs and skips the 3D.
 - **Fallback.** If `createStory` throws (no WebGL), or the user prefers reduced motion, `goStatic()` switches to the static layout.
+
+## Live city and ending ownership
+
+`daylight.js` generates the PBR city and rise from the shared layout manifest; it shares the city renderer, uses ACES tone mapping for daylight, then hands off to the existing wireframe compositor. See [LIVE-3D.md](LIVE-3D.md). `gsap.matchMedia()` owns normal/static lifecycle and disposal.
+
+`finale-stage.js` adds the original board group to the existing product scene and reuses the same `Wire`. No third renderer or replacement wire scene exists. `scene.js` reconstructs the smoke endpoint for each seek/resize; the adapter morphs its world path and scale to the original red rail. Only the smoke bridge (6.06–6.32) adapts the camera; the source spline, lens/view offset and red insertion timing are retained afterward. No added tip-follow translation and no smoke-to-board canvas fade.
+
+**Visibility invariant:** `finaleStage.hide()` is called before reconstructing the smoke endpoint. The original board updater must set `group.visible = fade > 0.005` every call, outside the cached material-opacity block. Otherwise constant fade 1 leaves the board hidden after the first frame. Diagnostics expose `boardVisible` and `connectionWires`; camera alignment alone cannot detect missing geometry.
+
+`room.js`/`original/roompaint.js` use Canvas2D and source `room.json` framing. Source times, loading, exact asset provenance and room frustum matching are documented in [ROOM-FINALE.md](ROOM-FINALE.md). Only stage-owned board resources are disposed by the adapter; do not traverse/dispose the entire shared product scene there.
 
 ## Rendering
 
@@ -179,7 +188,7 @@ In words: product x → city +Y, along the avenue; product y → city +Z, up; pr
 
 **Keep these consistent or the seam shows:** `SHAPES.entry`, `CITY_SCALE`, `AVENUE.tipY` (`HEAD_Y`), and both scenes' lights.
 
-## The exact hand-off from the day image
+## Isometric alignment and historical render matching
 
 At the start of `wireOn`, the city camera must reproduce the Blender orthographic camera:
 
@@ -217,14 +226,16 @@ At the start of `wireOn`, the city camera must reproduce the Blender orthographi
 Load it once with `GLTFLoader` (meshopt/Draco and KTX2 recommended), add it to `props.group`, and keep the same name on the returned object. `wireState()` only sets position, scale, visibility and opacity.
 
 **Change the city layout**
-Edit `hero_day.py` in Blender and re-render the day image. Then port the same table changes into `BUILDINGS` / `ROAD_SEGS` in `city.js`. Check `?at=wireOn:0.4` to confirm the lines still sit on the render.
+Update `art/data/city-layout.json`, `daylight.js` and the corresponding `BUILDINGS` / `ROAD_SEGS` wireframe data in `city.js`. Preserve alignment with the offline Blender reference when editing the shared layout. Check `?at=wireOn:0.4` to confirm the lines still sit on the render.
 
 **Move where the wire stops**
 Change `AVENUE.tipY`. The hand-over frame, `approachPath` and the camera follow it. Then check `?at=approach:0.99` and `?at=drain:0.99`.
 
 ## Performance notes
 
-- Rendering happens only on scroll ticks (scrub-smoothed), never on an idle loop.
+- Story geometry updates follow scroll progress; the visibility-gated GSAP ticker also handles live traffic and room repaint after image decode.
 - Pixel ratio is capped at 1.75.
 - Per scroll tick: the city is about 44k line vertices, 36 original hull meshes plus 689 instanced extended hulls, and 124 street lights (glow + pool). The wire rebuilds about 46k vertices on the CPU: jacket 261 × 37, strands 30 × 151 × 8.
 - **Not yet tested on real phones.** See [OPEN-ITEMS.md](OPEN-ITEMS.md).
+
+Use **Comet** for browser review. Implementation build passes; post-fix rear-board visual verification remains incomplete. See [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md).

@@ -1,3 +1,5 @@
+> Current direction and verification limits: [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md). This log records historical choices; later numbered decisions supersede earlier ones.
+
 # Decisions log
 
 This is a record of client direction and design decisions, in order. All entries are from **2026-11-04** unless noted. When a later decision replaces an earlier one, the earlier entry is marked *(superseded)*.
@@ -175,8 +177,102 @@ This is a record of client direction and design decisions, in order. All entries
 - **Done:** original five-switch board, wall materials, L/N/E seating and click pulses; red/black/green wires on the source rails; original camera spline and matched room handoff; original room images, pullback, five lighting steps and dark close. New `room` segment follows the expanded `finale` segment, then the current contact section.
 - **Implementation:** current Three.js/GSAP stack, no React migration, no added WebGL context. Original room imagery is rendered offline and painted on Canvas2D exactly as in the source. Full provenance, scope and validation are in `ROOM-FINALE.md`.
 
-### Single continuous wire at the switchboard (2026-11-04)
-The latest direction supersedes the three-wire finale: reuse the existing product cable and scene, morph its world-space path into the original red terminal rail, and track its tip continuously. No black/green cables, scene replacement, or canvas opacity dip. The original board camera arc and rendered room ending remain. Reconstruct the smoke endpoint on each seek so reverse scrolling and resizing are deterministic.
+## 24. Single continuous wire at the switchboard (2026-11-04)
+This direction superseded the three-wire count; its added tip-follow movement was then superseded by decision 25. Reuse the existing product cable and scene, morph its world-space path into the original red terminal rail, and track its tip continuously. No black/green cables, scene replacement, or canvas opacity dip. The original board camera arc and rendered room ending remain. Reconstruct the smoke endpoint on each seek so reverse scrolling and resizing are deterministic.
 
-### Restore original finale motion (2026-11-04)
+## 25. Restore original finale motion (2026-11-04)
 Use the original three-wire camera path, view offset and cubic red-wire insertion timing, with only one red cable. Remove the added tip-follow camera translation and delayed path sampling. A short smoke-camera bridge ends at source time 6.32; the original camera path is unchanged after that point.
+
+## 26. Restore rear-board visibility and use Comet
+
+- **Request:** the switchboard back was missing; compare the supplied GitHub code. Use Comet for browser access.
+- **Cause:** the adapter hid the original board group while reconstructing each frame. The source update restored visibility only when cached `fade` changed; constant fade 1 left the board hidden.
+- **Fix:** restore `group.visible` on every board update, independently of material-fade caching. Added `boardVisible` diagnostics and an assertion in the room regression script.
+- **Validation limit:** production build passed. Earlier desktop/portrait room tests passed alignment, lighting and cable opacity/identity but missed geometry visibility. The new assertion has not completed a successful post-fix run. Comet inspection timed out; final rear-board visual confirmation remains open.
+- **Delivery:** implementation committed and pushed as `6d33386` to `origin/bishwa-wire-v1`. Browser screenshots under `.taste-skill/` are ignored. This subsequent Markdown refresh is local until committed/pushed separately.
+- **Current handoff:** [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md) is the starting point for further work. The original decision 23 remains historical; only one red connection wire is current, and decision 25 governs camera movement.
+
+## 27. Integrated Biosciences hero frame and header (2026-11-04)
+
+- **Request:** implement the hero as in the Integrated Biosciences reference (screenshot supplied; study in [INTEGRATEDBIO-DESIGN-STUDY.md](INTEGRATEDBIO-DESIGN-STUDY.md)): the whole city inside a frame with the text in the same composition, the navbar in that style, and the frame growing to a full section on scroll, as the earlier framed opening did. **Keep Tamira's typefaces** (Geist Serif, Instrument Sans); no font change.
+- **Done:** the sticky stage is clipped to a rounded inset frame (12px/20px desktop, 8px/20px below 1024px) that opens to zero over `rise` 0–0.35. A daylight sky gradient sits behind the transparent city render and fades into the page colour over `rise` 0.55–0.95, before `wireOn`. Headline top-left (50–112px, line-height 1, −0.03em), sentence bottom-left, action bottom-right, on one centred 1524px container (`--hero-x`), which now also sets `--content-x` for the header, chapters, gauge and Contact. The header has the wordmark alone at the left and a frosted nav panel with a dark Contact action at the right; on smaller screens it is one frosted bar with a dark Menu toggle. A two-part slanted button (dark label, Tamira red arrow block in place of the reference's lime) replaces the red pill. The load reveal uses the reference timings.
+- **Adaptations:** the reference's mono uppercase controls are set in Instrument Sans uppercase, not a new face. The headline stays black on the light sky rather than white over dark video. A sky-coloured haze sits behind the sentence because the sharp clay edges cut through it.
+- **Unchanged:** camera path, city framing, rise, wireframe handover, product chapters, finale and room. The copy lift now applies to the headline/haze/sentence row individually, so the sentence stays above the city canvas.
+- **Validation:** `vite build` passed. Desktop 1440×900, phone 390×844, the open menu, rise 0.15/0.9, wireOn, copper, room and reduced-motion states were inspected in headless Chrome screenshots via agent-browser. **Not a Comet review:** Comet exposes no CDP endpoint and screen capture permission is off in this session. Comet visual sign-off and hover states remain open.
+
+## 28. One wire look across the city-to-product hand-over (2026-11-04)
+
+- **Request:** the wire's lighting changed during the transition into the copper chapter (Comet screenshots supplied); keep it the same.
+- **Cause:** at the end of `drain` the wire on screen is still the city copy, drawn in the city renderer. Its environment rotation was set from the city→product matrix, but three.js negates the Euler angles when building the shader lookup, so the room environment was upside down on that copy: city up looked up the product floor, and the jacket was lit from below. Two further differences: the strands still had full ember glow (flat peach), and the city tail ran flat down onto the avenue (an S-bend, sparser segments) instead of the product wire's straight tail.
+- **Fix (`src/story/scene.js`):** set the environment rotation to the negated Euler, so the city lookup equals the product's (checked numerically against three's conversion). Over `drain` 0.3–0.95, after the city has faded at 0.28, the city wire's tail blends onto exactly the product path (entry shape with the CatmullRom end ghost point), its tail length becomes the product's (entry length + 30), and the strand glow cools to 0. The product wire no longer adds glow of its own. Lights, tone mapping, environment intensity and camera were already identical.
+- **Unchanged:** camera choreography, the city run and approach, and every chapter after the hand-over.
+- **Validation:** `vite build` passed. Headless Chrome (agent-browser) screenshots at 1440×900 of `drain` 1 and `wireIn` 0.7 now match by eye, and `run` 0.8 and `drain` 0.6 were checked. Not a Comet review.
+
+## 29. Three wires at the switchboard (2026-11-04)
+
+- **Request:** after the less-smoke chapter, when the connection to the back of the switchboard starts, show three cables instead of one. This supersedes decision 24's single-wire count.
+- **Done (`src/story/finale-stage.js`):** the red product wire is unchanged: same instance, continuous from smoke, seated in L with no fade. Black and green are two more `Wire` instances (`src/story/wire.js` now takes `ink` and `envMapIntensity` options) at the red wire's finale scale on the source N/E rails. They use the source colours, legend ink and sheen (black 0.5, green 0.65), timing (finBlack 6.46–6.58, finGreen 6.54–6.66, cubic seat, 26-unit travel, 30-unit visible length) and screw clicks (6.58–6.61, 6.66–6.69). They are hidden until they move and hidden again whenever the finale stage is (scrolling back into smoke). Their materials are compiled when the stage is built during smoke. Camera, board, room and the decision 25 timing are unchanged.
+- **Validation:** `vite build` passed. `scripts/verify-room-finale.mjs` now expects 1/2/3 connection wires across the sequence, and it passed (wire counts, board visibility, red cable identity and opacity, handoff error 0.004px, lighting steps 7). Visual frames at finale 0.30/0.45/0.53/0.66/0.92 were reviewed **in Comet** (automated separate instance via agent-browser `--executable-path`, Comet's Chromium 156, headless, 1440×900): red then black then green seat with click rings, and the front view shows no cables. Reverse scroll to smoke shows only the red wire.
+
+## 30. Rebuild the room with realistic materials (2026-11-04)
+
+- **Request:** refine the final room design with realistic textures and materials, rendered on the Windows team machine through the team Blender connection, on the GPU.
+- **Done:** the room has no source scene, so it was rebuilt in Blender 5.2 (`art/blender/build_room.py`) with the same layout, measured from the original renders through `room.json`. Materials: oak laminate floor, oak veneer furniture and frame, tinted painted plaster, linen upholstery, herringbone wool rug, waffle-cotton throw, translucent sheers, thin window glass, real plants, and a dusk sky with a tree outside. All are CC0 Poly Haven (see REFERENCES-AND-ASSETS). Cycles lighting is 3000 K, AgX, exposure +1.05. The 48 frames keep the original cameras, crops, sizes, file names, five cumulative lighting steps, rocker flips and the painter's soft-edge profile. Board alignment within 0.08 px at every level; regression script board error 0.006/0.004 px with 7 lighting checks passing.
+- **Team machine:** rendered as a separate background `blender.exe` writing only under `tamira-reference-match`; the teammate's open Blender was not modified. The GPU was saturated by Unreal Editor; at the user's request its unsaved level was saved as `/Game/Untitled_backup_2026_11_04` and Unreal was closed normally (it relaunched on its own afterwards, idle). The final run took 31 minutes on the RTX 3060 (OptiX).
+- **Format:** still the image route (48 pre-rendered frames painted on Canvas2D), with no code changes. A live GLB room is the agreed follow-up, to be built and compared side by side before any switch.
+- **Weight:** 2.7 MB for the 48 WebPs (was 1.9 MB). The originals remain in git history.
+- **Validation:** viewed in Comet (separate muted instance): the 3D board hand-off, pull-back and fully lit room at 1440×900. Portrait viewed in renders only.
+
+## 31. Live GLB room: lab prototype (2026-11-04)
+
+- **Request:** start the GLB version of the room, uncompressed, "immersive and top notch quality". The user chose a *visually lossless* budget over a literal 170 MB uncompressed export.
+- **Done:** `art/blender/export_room_glb.py` exports the same Blender room (built on the Mac from `build_room.py`, since multi-MB binaries can't cross the team-Blender link) to `public/room-3d/`:
+  - `room.glb`: 13 MB, 336K triangles, no Draco, no decimation.
+  - 2K tinted texture sets: colour JPEG q95, normal/roughness WebP q95, all on world-scale UVs.
+  - The outside tree (1.07M triangles, seen only through the window) is a 2K Cycles-rendered cut-out.
+  - `room-lights.json` (17 lights in 5 groups, emissive materials, texture sizes) and the 2K dusk HDRI. About 45 MB in total.
+- **Lab page:** `room-lab.html` (dev only; the story still uses the 48 images).
+  - Cycles-equivalent light units, AgX, soft spot shadows, GTAO, sheen on fabrics, dusk HDRI outside.
+  - Lighting steps with rocker flips, pull-back slider using the painter's own window maths, image overlay for comparison, and free-look orbit.
+  - Verified in Comet (muted): the overlay lines up exactly with the rendered frames; about 45 fps on an M3 at 1440×900.
+- **Open:** no global illumination yet; a warm fill stands in for bounce. Next is Cycles-baked lightmaps per lighting group, summed by step in the shader, for render-matching bounce light. After that, story integration (board hand-off into the live room) and phone performance. `public/room-3d` ships in `dist` although the story doesn't load it yet.
+
+## 32. Live GLB room in the story behind ?room=glb (2026-11-04)
+
+- **Request:** wire the GLB room into the story behind `?room=glb`.
+- **Done:**
+  - `src/story/room-glb.js` holds the shared live room: GLB load, materials with Cycles normal strengths, Cycles-unit lights, AgX, shadows, GTAO, the camera from room.json through the painter's `windowAt`/`tanRect`. Each of the five lighting groups takes a 0–1 level, so lights and glow fade in and each rocker tips over with its light.
+  - `src/story/room-live.js` has the same interface as `createRoom()`. It lazy-loads Three.js and the GLB near the end of smoke, stays hidden until ready (never covers the live board with an empty canvas), fades in over 6.99–7.06, follows `ROOM_BEATS` for the pull-back and steps, and keeps the dark close. It re-renders only when something changes.
+  - `main.js` picks it when the URL has `?room=glb`; the images stay the default. The lab page now uses the shared module.
+- **Validation:** `vite build` passed; the room code is a separate lazy chunk. `verify-room-finale.mjs` (default image mode) passed: board error 0.006/0.004 px, 7 lighting checks. In Comet (muted), `?room=glb` at 1440×900: the board hand-off matches (finale 0.97 → room 0.03), the step-2 close-up has two rockers on, and the full room sits under the copy.
+- **Open:**
+  - A third WebGL context on the page.
+  - No baked bounce light yet (the warm fill stands in).
+  - Phones and reverse-scroll not yet checked in GLB mode.
+  - If the GLB fails to load, the room stays hidden; there's no image fallback.
+
+## 33. GLB room by default on desktop, Cycles-baked lightmaps (2026-11-05)
+
+- **Requests:** bake the room lightmaps on the Windows GPU; phones keep the image sequence for performance; "implement all this in the main localhost server link"; close Unreal on the team machine.
+- **Default:** desktop-class screens now get the live GLB room in the story. Phones and tablets (coarse pointer, short side under 900 px) always get the 48 images. `?room=images` forces the images on desktop.
+- **Bake:**
+  - `export_room_glb.py … lm` adds a shared lightmap UV atlas (TEXCOORD_1, 19 static meshes) and saves `web.blend`.
+  - `bake_room_lightmaps.py` bakes six 2048² HDR maps in Cycles on the RTX 3060, 1024 samples, in 24.5 minutes: the dusk sky (direct + indirect) and each light group's indirect light.
+  - GLB and maps came over as packed data images (`art/tools/data_png.py`, SHA-256 verified), were denoised with OIDN on the Mac (pixel noise −61%, energy unchanged), and were encoded as RGBM WebP (round-trip error 0.1–0.2%). That's 19 MB of maps; `public/room-3d` totals about 64 MB.
+- **Shader:** the six maps are summed, each weighted by its group's level. It stays within WebGL's 16 textures per shader: the dusk map is the material's own `lightMap`, and only the pendant and arc lamp cast live shadows.
+- **Calibration** (Comet, 1440×900, scene brightness against the renders):
+  - The environment map was adding unoccluded diffuse light, so it's now reflections on glossy unbaked parts only.
+  - Bake scale 1/π; per-group scales `[0.42, 0.15, 0.17, 0.17, 0.17]`.
+  - Neutral tone mapping at +0.4 stops; three's AgX washed out the 3000 K warmth.
+  - Result: dusk 0.113 against 0.105, step 1 0.223 against 0.250, step 5 0.334 against 0.341; red-to-blue 2.9–3.3 against 3.2–3.3.
+- **Team machine:** Unreal Editor was closed with a normal close at the user's request. The team watchdog (`C:\blender-mcp\watchdog.ps1`, scheduled task) restarts it within seconds, so it can't stay closed without changing that task; I left the watchdog alone. The bake ran on the GPU while Unreal sat idle.
+- **Validation:** `vite build` passed; no shader errors. `verify-room-finale.mjs` now runs against `?room=images` and passed (0.006/0.004 px, 7 lighting checks). In Comet (muted), the main page in GLB mode showed the board hand-off, the close-up and the full room.
+- **Open:** phone check of the image fallback after this change; GLB-mode reverse scroll; no image fallback if the GLB fails to load; GPU memory with three WebGL contexts on lower-end desktops.
+
+## 34. Image room on desktop again (2026-11-05)
+
+- **Request:** use the image sequence on desktop as well; the GLB room was breaking.
+- **Done:** `main.js` uses the 48 rendered images everywhere. `?room=glb` still opens the live GLB room on desktop as a development switch (phones never). The GLB code and `public/room-3d` stay in the repo, but the default page doesn't load them. `verify-room-finale.mjs` is back on the plain URL.
+- **Validation:** `vite build` passed; the regression passed (0.006/0.004 px, 7 lighting checks). In Comet (muted) at 1440×900, the room diagnostics report the image painter and the fully lit room renders.
+- **Open:** the cause of the user-reported GLB breakage isn't diagnosed yet.
+

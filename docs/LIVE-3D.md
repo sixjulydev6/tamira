@@ -22,9 +22,13 @@ Traffic is the one ambient animation: GSAP's ticker advances it only while dayli
 
 `gsap.matchMedia()` owns normal/reduced-motion setup. A mode change stops the ticker, disposes renderers, geometry, materials, environment targets and compositor passes, and removes listeners before rebuilding. Context loss stops the scroll story and reveals static content. No automatic context-restoration loop is attempted; reload to retry after a lost context.
 
+## Three-wire finale extension
+
+The same product scene and `Wire` continue into the original red terminal, and two more `Wire` instances (black, green) seat in N and E (DECISIONS 29); no extra WebGL renderer or replacement cable scene. The camera uses the source three-wire choreography, with a short smoke bridge and no added tip-follow movement. The original room uses Canvas2D source images, not live Three.js furniture. See [ROOM-FINALE.md](ROOM-FINALE.md).
+
 ## Verification
 
-Run `npm run build`. For the browser integration script, provide an installed Chrome executable via `CHROME_PATH` and, optionally, a path to the taste-skill CDP helper via `TASTE_CDP_MODULE`, then run `node scripts/verify-live-city.mjs` with Vite on port 5180.
+Use **Comet** for browser access and visual review. Run `npm run build`. Historical browser integration scripts remain available; provide an installed Chrome executable via `CHROME_PATH` and, optionally, a path to the taste-skill CDP helper via `TASTE_CDP_MODULE`, then run `node scripts/verify-live-city.mjs` with Vite on port 5180.
 
 The script checks desktop and phone initialization, absence of image-sequence/video requests, horizontal overflow, scene seeking and reversing, live reduced-motion switching, and context-loss fallback. It captures the rise, transition, powered city, cable, copper, strands, heat, flame and finale. Reports and screenshots go to `.taste-skill/live-city/`.
 
@@ -33,3 +37,5 @@ Initial browser checks: no captured JavaScript exceptions at 1440×900 and 390×
 Remaining limits: no real-device GPU profiling, no path-traced indirect bounce, simplified car motion without intersection collision simulation, and the existing city-wire overlay occlusion workaround. Product specifications and contact destinations remain placeholders listed in `OPEN-ITEMS.md`. Old media still exists in `public/` and is copied by Vite; it is not fetched by the live story, but a separate asset cleanup is needed before deployment.
 
 Technical references: [Three.js PBR materials](https://threejs.org/docs/pages/MeshStandardMaterial.html), [GSAP matchMedia](https://gsap.com/docs/v3/GSAP/gsap.matchMedia/), [ScrollTrigger](https://gsap.com/docs/v3/Plugins/ScrollTrigger/). Implementation uses the repository's pinned Three.js r170 and GSAP 3.12.5 APIs, not newer renderer-only features.
+
+The latest board visibility fix and expanded `boardVisible` assertion have not received a completed Comet/post-fix regression run. Earlier browser passes described above predate that fix and missed the hidden board. Latest state and pushed implementation commit: [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md).

@@ -25,7 +25,7 @@ const STRAND_LAYOUT = (() => {
 })();
 
 export class Wire {
-  constructor({ color = "#c21d19", capColor = "#d2453c" } = {}) {
+  constructor({ color = "#c21d19", capColor = "#d2453c", ink = "rgba(255, 232, 224, 0.62)", envMapIntensity = 0.7 } = {}) {
     this.group = new THREE.Group();
     this.samples = null;
     this.length = 1;
@@ -40,7 +40,7 @@ export class Wire {
     // jacket
     this.jacketGeo = tubeGeometry(JACKET_SEG, JACKET_RAD);
     const jacketMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, map: legendTexture(color), roughness: 0.4, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity: 0.7,
+      color: 0xffffff, map: legendTexture(color, ink), roughness: 0.4, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity,
       side: THREE.DoubleSide,
     });
     jacketMat.onBeforeCompile = (shader) => patchJacket(shader, this.jacketUniforms);
@@ -228,14 +228,14 @@ function strandsGeometry() {
   return geo;
 }
 
-/* red jacket with the printed legend running along it; the text sits on the side facing the camera */
-function legendTexture(color = "#c21d19") {
+/* jacket colour with the printed legend running along it; the text sits on the side facing the camera */
+function legendTexture(color = "#c21d19", ink = "rgba(255, 232, 224, 0.62)") {
   const c = document.createElement("canvas");
   // proportioned like the surface it wraps: TEXT_REPEAT long by 2π·R around (≈ 2 : 1)
   c.width = 2048; c.height = Math.round(2048 * (2 * Math.PI * R_JACKET) / TEXT_REPEAT);
   const g = c.getContext("2d");
   g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = "rgba(255, 232, 224, 0.62)";
+  g.fillStyle = ink;
   g.font = "500 58px 'Instrument Sans', ui-sans-serif, system-ui, sans-serif";
   g.textBaseline = "middle";
   // uv runs tip → tail (screen-left) and around the tube downward on screen, so the legend is drawn

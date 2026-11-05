@@ -31,7 +31,7 @@
         <li><a href="#industries">Industries</a></li>
         <li><a href="#investors">Investors</a></li>
         <li><a href="#company">Company</a></li>
-        <li><a class="nav-contact" href="#contact">Contact us</a></li>
+        <li class="nav-list__action"><a class="nav-contact" href="#contact">Contact us</a></li>
       </ul>
     </nav>
   </header>
@@ -42,6 +42,9 @@
          into the wire's tip, and the wire tells its own story on a light page. -->
     <section class="story" aria-labelledby="hero-title">
       <div class="story__stage">
+        <!-- The hero frame: the stage is clipped to a rounded inset frame (style.css) that opens to the
+             full screen on the first scroll (main.js render). The sky tint sits behind the city. -->
+        <div class="story__sky" aria-hidden="true"></div>
         <!-- Fallback stills only. scene.js builds the daylight city, camera rise, traffic and
              wireframe in Three.js on the story canvas. HTML copy stays selectable behind the skyline. -->
         <div class="hero__stage" aria-hidden="true">
@@ -66,9 +69,10 @@
             <span class="line"><span class="line__inner">Good wiring is the kind</span></span>
             <span class="line"><span class="line__inner">you never think about</span></span>
           </h1>
+          <div class="hero__haze" aria-hidden="true"></div>
           <div class="hero__aside">
             <p class="hero__lede">Tamira makes copper house wire for homes and buildings: safe, flexible, and built to last.</p>
-            <a class="hero__cta" href="#contact">Talk to us</a>
+            <a class="btn hero__cta" href="#contact"><span class="btn__label">Talk to us</span><span class="btn__arrow" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
           </div>
         </div>
 

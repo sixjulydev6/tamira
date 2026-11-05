@@ -1,0 +1,53 @@
+{
+ "encoding": "RGBM",
+ "maps": [
+  {
+   "file": "lm-0.webp",
+   "range": 0.80859375,
+   "size": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "file": "lm-1.webp",
+   "range": 0.5546875,
+   "size": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "file": "lm-2.webp",
+   "range": 4.03125,
+   "size": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "file": "lm-3.webp",
+   "range": 5.59375,
+   "size": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "file": "lm-4.webp",
+   "range": 4.21875,
+   "size": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "file": "lm-5.webp",
+   "range": 3.25,
+   "size": [
+    2048,
+    2048
+   ]
+  }
+ ]
+}

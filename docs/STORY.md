@@ -1,7 +1,3 @@
-> **Ending update — decision 23:** after smoke, the expanded `finale` runs the original rear three-wire switchboard connection and camera arc; new `room` pulls into the original living room and switches on five lighting groups. See [ROOM-FINALE.md](ROOM-FINALE.md). Earlier single-switch finale descriptions below are superseded.
-
-> **Update — decision 22:** `rise` is now a continuous Three.js camera move over procedural city geometry, not a rendered image sequence. The segment order and pacing remain unchanged. GSAP labels drive all stages; daylight traffic runs on its ticker. See [LIVE-3D.md](LIVE-3D.md).
-
 # The scroll story
 
 The whole homepage is one pinned stage. A single scroll progress value `p` (0 → 1) drives everything:
@@ -9,7 +5,7 @@ The whole homepage is one pinned stage. A single scroll progress value `p` (0 �
 - the 3D camera, wire and shaders
 - the copy, the labels and the gauge
 
-Each of these is a pure function of `p`. Nothing moves on a timer, so scrolling back reverses everything exactly. The only time-based motion is the one-off page-load reveal and the hero's traffic loop, a fixed backdrop that pauses once the wireframe takes over.
+Each of these is a pure function of `p`. Nothing moves on a timer, so scrolling back reverses everything exactly. The only time-based motion is the one-off page-load reveal and live daylight traffic on the GSAP ticker, paused when daylight is hidden.
 
 ## How the scroll is divided
 
@@ -17,43 +13,41 @@ The story is split into **segments**. Each segment gets a length in **screens**,
 
 | # | Segment | Screens | What happens |
 |---|---|---|---|
-| 1 | `day` | 0.35 | Street level: the orange crown tower rises in front of the centred headline; sentence and button on the left. A short beat before anything moves. |
-| 1b | `rise` | 1.6 | The copy lifts away and the camera rises from street level to the isometric view (rendered frames, scroll-scrubbed). |
+| 1 | `day` | 0.35 | Street level inside the rounded hero frame: headline top-left (the crown tower rises in front of it), sentence bottom-left, button bottom-right. A short beat before anything moves. |
+| 1b | `rise` | 1.6 | The copy lifts away and the camera rises from street level to the isometric view (live Three.js geometry). |
 | 2 | `wireOn` | 1.2 | The day city turns into the wireframe: the page goes white → warm night and orange lines climb the same buildings. |
 | 3 | `extend` | 1.4 | The camera pulls back; a larger wireframe city grows in around a street-lit avenue. |
 | 4 | `run` | 2.2 | The red wire runs along the avenue. Street lights and buildings light up behind its tip. |
 | 5 | `approach` | 1.4 | One continuous push-in from the wide diagonal view to a close diagonal of the wire. |
 | 6 | `drain` | 1.0 | The city drains into the wire's tip fast, the page turns lavender, and the tip lifts and settles. |
-| 7 | `wireIn` | 0.9 | Hand-over to the product wire (an identical frame), whose glow cools to copper. |
+| 7 | `wireIn` | 0.9 | Hand-over to the product wire: an identical frame, the same lighting, plain copper. |
 | 8 | `copper` | 1.5 | Chapter: "Tamira is named after copper." |
 | 9 | `strands` | 1.7 | Chapter: "Thirty strands do the work together." |
 | 10 | `flex` | 1.7 | Chapter: "Tight corners are no problem." |
 | 11 | `heat` | 1.9 | Chapter: "Indian summers don't bother it." |
 | 12 | `flame` | 1.7 | Chapter: "If it catches fire, it puts itself out." |
 | 13 | `smoke` | 1.3 | Chapter: "It gives off less smoke, too." |
-| 14 | `finale` | 1.7 | Chapter: "Wire it once, and forget it's there." |
+| 14 | `finale` | 4.0 | Same red wire seats in L at the original board rear, then black (N) and green (E); original camera arc to the front. |
+| 15 | `room` | 3.0 | Original rendered room pullback and five lighting groups, then dark close. |
 
-- **Total:** 21.15 screens of story. The `.story` section is `(21.15 + 1) × 100svh` tall; the extra screen is the pinned stage itself.
+- **Total:** 26.85 screens of story. The `.story` section is `(26.85 + 1) × 100svh` tall; the extra screen is the pinned stage itself.
 - **Retuning pacing:** change the `screens` values. Everything inside a segment is expressed as 0–1 progress through it (`local(p, id)`), so lengths can change freely.
 - **Jumping to a moment (dev only):** `?at=<segment>:<t>`, for example `?at=approach:0.99`.
 
 ## Beat by beat
 
 ### 1. Day (`day`)
-- **What's on screen:** the header; the centred headline "Good wiring is the kind / you never think about"; full bleed behind and around it, a street-level shot of the same clay city (camera on the −Y side, 50 mm, 35 m up, 430 m out, looking slightly up), the orange crown tower centred and unobstructed (93%, measured by ray casts), white sky. The tower's top cuts into the headline's second line (the tower layer sits in front of the words, as in the client's reference); the sentence and "Talk to us" sit in the left column over the sky. On phones the copy is centred at the top and the street-level picture starts shrunk to a skyline ~2.1 screens wide along the bottom.
-- **The picture:** `hero-rise-{1920,3840}.webp` (`.hero__opening`), rise frame 0 rendered at 3840, sky transparent so the page and the headline show through. The far ground fades to transparent beyond the isometric frame (render setting only; the asset is unchanged).
-- **Page load:** the header fades in, the two headline lines rise in turn, the sentence and button follow, and the street-level picture fades in.
+- **Current composition (DECISIONS 27):** the stage is a rounded frame (12px inset, 20px radius on desktop) on a white page surround, with a daylight sky gradient behind the live city. Wordmark top-left, frosted nav panel top-right, headline top-left, sentence bottom-left over a soft haze, two-part "Talk to us" button bottom-right. The camera and city framing below are unchanged. Earlier layout, kept for history: the header; the centred headline "Good wiring is the kind / you never think about"; full bleed behind and around it, a street-level shot of the same clay city (camera on the −Y side, 50 mm, 35 m up, 430 m out, looking slightly up), the orange crown tower centred and unobstructed (93%, measured by ray casts), white sky. The tower's top cuts into the headline's second line (the tower layer sits in front of the words, as in the client's reference); the sentence and "Talk to us" sit in the left column over the sky. On phones the copy is centred at the top and the street-level picture starts shrunk to a skyline ~2.1 screens wide along the bottom.
+- **First-paint/fallback picture:** `hero-rise-{1920,3840}.webp` (`.hero__opening`), rise frame 0 rendered at 3840, sky transparent so the page and the headline show through. The far ground fades to transparent beyond the isometric frame (render setting only; the asset is unchanged).
+- **Page load:** the header fades in; the two masked headline lines rise (0.8s, 0.05s stagger) with the sentence; the button pops in from 0.4s; the street-level picture fades in.
 
 ### 1b. The rise (`rise`)
-- **0–20%:** the headline, sentence and button rise 24px and fade out.
-- **The camera move:** 72 Cycles frames (`/media/rise/r_0000–0071.webp`, 1600 wide, alpha) from `art/blender/animate_city.py` job `rise`. Azimuth −90° → −45°, elevation −6° → 38°, target from the tower's mid-height to the isometric centre, frame width 311 → 400 m, while the camera dollies out (to 40 km) and the lens lengthens: a dolly-zoom into the orthographic view. The last frame *is* the isometric hero camera. `main.js` draws them on `.hero__seq` (same cover crop as every layer) and crossfades neighbours, so scrubbing is smooth; frames load after first paint and the nearest loaded frame (or the opening still) stands in.
-- **95–100%:** the isometric layer (`.hero__iso`: the day render + traffic loop) takes over from the last frame; at 100% the street-level layer is hidden. The traffic loop starts once the rise has landed (frame 0 of the loop = the rise's last frame) and pauses once `wireOn` hides the image.
-- **Phones:** the shrunk skyline grows back to full-screen cover over 5–60% of the rise.
-- Replaces the framed hero (incident.io pattern, DECISIONS 14) on client direction (DECISIONS 20).
+
+The headline, sentence and action lift and fade over the first 20%. The hero frame's inset and corner radius open to zero over the first 35%, and the sky tint fades into the page colour over 55–95%, so the wireframe handover meets the same full-screen frame as before. `daylight.js` moves the live camera from street-level perspective into the matching isometric composition. The city is generated from `art/data/city-layout.json`; it includes 37 buildings, 1,721 windows and 54 moving cars. Phone skyline framing follows the current camera implementation. No rise WebP sequence or traffic video is requested. The opening transparent still remains for first paint/static fallback. See [LIVE-3D.md](LIVE-3D.md).
 
 ### 2. Day → wireframe (`wireOn`)
 - **Page colour:** white → warm night (`#140b07`) over roughly 12–50% of the segment.
-- **The hand-over to 3D:** the city canvas fades in over the image. It draws:
+- **The live handover:** the shared city renderer composites the daylight city into the wireframe. It draws:
   - a backdrop in the page colour
   - dark hulls for the buildings
   - crown-orange lines that climb the buildings from street level
@@ -90,11 +84,11 @@ This beat is fast.
 |---|---|
 | ~0–25% | The whole network (lines, hulls, street lights) drains into the wire's tip: a shrinking screen-space circle with a bright leading edge. The city is gone. |
 | ~14–42% | The page goes warm night → lavender (`#e4e4ee`). The text turns dark. |
-| After that | The tip lifts into the product wire's opening shape, and the camera finishes settling on the hand-over frame against the clean background. |
+| After that | The tip lifts into the product wire's opening shape, and the camera finishes settling on the hand-over frame against the clean background. Over 30–95% the tail straightens onto the product wire's path and length, and the ember glow cools to copper (DECISIONS 28). |
 
 ### 7. Hand-over (`wireIn`)
 - **The swap:** the drain ends on exactly the frame the product wire starts from. The product canvas fades in over it, and there is no visible cut.
-- **The glow:** the copper strands' ember glow cools to copper.
+- **One look:** the glow has already cooled during the drain, and both copies share lights, environment orientation, tone mapping, path and tail, so the product wire matches the frame it replaces.
 
 ### 8–14. Product chapters
 Each chapter's copy (title, body, spec line) appears in the upper-left column. The wire and props work on the right. Each chapter gets a soft background tint.
@@ -107,7 +101,15 @@ Each chapter's copy (title, body, spec line) appears in the upper-left column. T
 | `heat` | A heater block rises under the wire; orange heat glows along the jacket; a gauge counts 25 → 85°C (70°C ordinary PVC, 85°C Tamira) | Indian summers don't bother it. |
 | `flame` | A flame touches the jacket, chars it, and dies out | If it catches fire, it puts itself out. |
 | `smoke` | Thin grey wisps rise from the char | It gives off less smoke, too. |
-| `finale` | The wire runs into a wall switch plate; the rocker flips and the LED goes green | Wire it once, and forget it's there. |
+| `finale` | Same red cable into the original rear red terminal; original screw/pulse and camera arc | Wire it once, and forget it's there. |
+
+### 14–15. Three-wire connection and room
+
+The same product `Wire` and `wireScene` remain in use. The cable path/scale morph and smoke camera bridge finish by source time 6.32. The original camera spline then runs unchanged: rear box; red (the continuous product wire) seats in L at 6.38–6.50, then fresh black and green lengths slide up into N (6.46–6.58) and E (6.54–6.66), each with its own screw click (red 6.50–6.53, black 6.58–6.61, green 6.66–6.69) (cubic easing, DECISIONS 29); arc around the wall, front plate, room-camera match. No canvas opacity dip. The user rejected added travelling-tip camera motion.
+
+`finale` maps source time 6.06–7.06; `room` maps 7.06–7.94. The room is painted from original images, starting only after a decoded frame is available. It pulls back and switches on downlights, pendant, sconces, arc lamp and TV-unit strip. The room darkens at the close before the existing contact section. This later close is separate from the removed smoke-to-board fade.
+
+The rear-board visibility fix restores the group's visibility on every update, independently of cached material fade. It is implemented but still needs completed visual confirmation in Comet; earlier alignment checks missed the hidden geometry. See [ROOM-FINALE.md](ROOM-FINALE.md).
 
 After the story, a plain `.end` section ("Talk to us about your next build" plus a Contact button) closes the page. It's a stand-in for the rest of the site.
 
@@ -147,7 +149,7 @@ With `npm run dev` running:
 ?at=approach:0.99    the close diagonal frame
 ?at=drain:0.22       city gone, page lightening
 ?at=wireIn:0.6       product wire
-?at=copper:0.55  ?at=strands:0.6  ?at=flex:0.6  ?at=heat:0.6  ?at=flame:0.35  ?at=smoke:0.45  ?at=finale:0.8
+?at=copper:0.55  ?at=strands:0.6  ?at=flex:0.6  ?at=heat:0.6  ?at=flame:0.35  ?at=smoke:0.45  ?at=finale:0.45  ?at=finale:0.8  ?at=room:0.55
 ```
 
 ## Reduced motion and no WebGL
@@ -157,3 +159,5 @@ When the user prefers reduced motion, or WebGL is unavailable, the page switches
 - the day image shows
 - the chapter copy is laid out as plain sections
 - the header gets a solid background
+
+The static layout also includes the original fully lit room still. Browser review must use **Comet**. Current delivery and verification limits: [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md).

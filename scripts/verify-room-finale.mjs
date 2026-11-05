@@ -21,7 +21,8 @@ try {
     for(const t of [.001,.08,.16,.24,.30,.32,.38,.45,.53,.61,.79,.94]){
       await p.eval(t=>window.__tamira.seek('finale',t),t);await wait(160);
       const continuous=await p.eval(()=>({f:window.__tamira.diagnostics().finale,opacity:+getComputedStyle(document.querySelector('.story__canvas--wire')).opacity}));
-      assert(continuous.f.connectionWires===1,'Extra connection wires');
+      // red (the product wire) from the start; black and green join as they slide up (finale t 0.40 / 0.48 = source u 6.46 / 6.54)
+      assert(continuous.f.connectionWires===(t<.40?1:t<.48?2:3),`Expected connection wires at ${t}: ${continuous.f.connectionWires}`);
       assert(continuous.f.boardVisible,'Switchboard hidden after frame reset');
       wireId ??= continuous.f.wireId;
       assert(continuous.f.wireId===wireId,'Cable object changed');

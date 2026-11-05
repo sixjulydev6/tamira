@@ -5,7 +5,7 @@
 | Reference | What we took from it | What we didn't |
 |---|---|---|
 | **arrakis.tech** | Grid, margins, header layout, text placement, type scale, weights, tracking, leading (measured with REA from its shipped CSS/DOM) | Fonts, imagery, all-caps mono labels |
-| **wirecable-showcase.vercel.app** (Sixjuly concept, fictional Tamira brand) | Chapter order and copy, the idea of a scroll pacing table, procedural wire geometry | Its dark studio look, centred copy, coil/box opener, pre-rendered room finale, its specs (illustrative only) |
+| **wirecable-showcase.vercel.app** (Sixjuly concept, fictional Tamira brand) | Chapter order and copy, the idea of a scroll pacing table, procedural wire geometry, original five-switch board/camera and rendered-room assets | Its dark product-stage look, centred chapter copy and coil/box opener; its specs remain illustrative. The original rendered room is now explicitly reused. |
 | **Storyboard "MacBook Air - 17.pdf"** (client) | Mood and camera direction: isometric day city → cyan wireframe night → light lavender page with a cable from the bottom-left | Literal frames; the multi-core cable it shows |
 | **Isometric city stills with a train** (client, two images) | The extended-city idea and a diagonal track through the city; the wire replaces the train | The bridge/platform and the solid daylight style (our extended city is wireframe) |
 | **Screen recordings and screenshots** (client feedback) | Frame-by-frame review that drove decisions 8 and 9 in [DECISIONS.md](DECISIONS.md) | — |
@@ -16,17 +16,17 @@ The client's original reference images are in the source project: `tamira-refere
 
 | File | Status |
 |---|---|
-| `public/media/hero-city-2560.*`, `hero-city-1920.*` (AVIF, WebP, JPG) | **Used.** The day render, 16:9, from `art/blender/build_city.py` (clay / satin-ceramic finish). It is the hero image, and the wireframe is aligned to it. |
-| `public/media/hero-traffic-2560.webm`, `.mp4` | **Used.** The traffic loop over the hero (10 s, 24 fps, AV1 / H.264), from `art/blender/animate_city.py`. Frame 0 is the `hero-city-*` still. |
+| `public/media/hero-city-2560.*`, `hero-city-1920.*` (AVIF, WebP, JPG) | **Retained reference.** Offline 16:9 clay render. The normal city is now procedural Three.js from the same layout; no active hero-city image playback. |
+| `public/media/hero-traffic-2560.webm`, `.mp4` | **Retained reference, not requested at runtime.** Live GSAP-ticker-driven cars replaced video playback. |
 | `public/media/hero-day.jpg` | **Unused** since 2026-11-04 (replaced by `hero-city-*`, same layout and camera). A copy is kept in `art/review/baseline/hero-day-previous.jpg` for comparison. |
 | `public/media/hero-day-night.mp4`, `hero-day-night-1280.mp4`, `hero-night.jpg` | **Unused** since the night stage was removed. They are still copied into `dist/` by the build; delete them before deploying unless needed. |
 | `art/renders/`, `art/review/` | Hero master (3840×2160 PNG), review crops, baseline/after screenshots, alignment overlay. Not shipped. |
 | `public/favicon.svg` | Placeholder |
 | `assets/vids/*.mov` | Client screen recordings used for review. Not part of the site. |
 
-## The current hero: `art/blender/build_city.py`
+## Offline hero reference: `art/blender/build_city.py`
 
-The clay / ceramic day city that ships now. It is a straight port of `hero_day.py`'s layout, crown and camera; only the finish differs. How to render, encode and check it: [art/README.md](../art/README.md). The brief it implements is `prompt.md` at the repo root.
+The offline clay / ceramic city used as the art reference for the current live city. It is a straight port of `hero_day.py`'s layout, crown and camera; only the finish differs. How to render, encode and check it: [art/README.md](../art/README.md). The brief it implements is `prompt.md` at the repo root.
 
 **What changed from `hero_day.py` v1, and why:**
 
@@ -97,5 +97,17 @@ Renders run on a shared "team Blender" machine (Windows, RTX 3060, Blender 5.2.2
 
 ## Tools used
 
-- **REA** (reverse-engineer-anything): browser capture and CSS/DOM/JS-bundle analysis of the reference sites. Also used for every screenshot review of this site, including the `?at=` review frames.
+- **REA**: earlier passive reference-site inspection. Separate CDP automation supplied some measurements and screenshots; do not attribute all reviews to REA.
+- **Comet**: required browser for current access/review, per user direction. The post-fix board review timed out and remains incomplete.
 - **Swift + AVFoundation:** frame extraction from the client's `.mov` recordings (ffmpeg isn't installed on the dev machine).
+
+## Current runtime asset map
+
+- `art/data/city-layout.json` → `src/story/daylight.js`: live city/rise/traffic. No runtime GLB or `.blend` loading.
+- `public/media/hero-rise-{1920,3840}.webp`: transparent opening/fallback stills.
+- `public/media/rise/`: retained historical sequence, not requested by the live story; still copied into build output.
+- `public/room/*.webp`: 48 images rebuilt in Blender 5.2 with realistic materials (DECISIONS 30) on the source cameras, crops and board position; the source originals remain in git history. Poly Haven (CC0): textures `laminate_floor_02`, `oak_veneer_01`, `painted_plaster_wall`, `rough_linen`, `poly_wool_herringbone`, `waffle_pique_cotton`; models `potted_plant_01`, `potted_plant_02`, `island_tree_02`; HDRI `belfast_sunset_puresky`. Build: `art/blender/build_room.py`, `art/blender/finish_room.py`. Selected aspect loads 24 near smoke. Room source and board framing metadata: `src/story/room.json`.
+- `asset/tamira-logo.svg`: supplied source logo; served as `public/tamira-logo.svg`.
+- `.taste-skill/`: ignored local review artifacts, excluded from the pushed implementation.
+
+Source ending repository commit: `9d1eb33fceaaa3f681e3e1e06c198b753f4e965d`. Current site implementation commit: `6d33386` on `bishwa-wire-v1`. See [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md) for the accepted single-wire direction and remaining validation.
