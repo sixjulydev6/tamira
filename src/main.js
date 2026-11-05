@@ -106,9 +106,9 @@ function runStory() {
   const riseLayer = document.querySelector(".hero__rise");
   const heroStage = document.querySelector(".hero__stage");
   const heroCopy = document.querySelector(".hero__copy");
-  // the lift is applied to the headline and the bottom row, not their wrapper: opacity/translate on
+  // the lift is applied to the headline, sentence and action, not their wrappers: opacity/translate on
   // the wrapper would flatten them into one layer under the city canvas (the sentence must stay above it)
-  const heroParts = [".hero__title", ".hero__haze", ".hero__aside"].map((q) => document.querySelector(q));
+  const heroParts = [".hero__title", ".hero__lede", ".hero__aside"].map((q) => document.querySelector(q));
   const storyStage = document.querySelector(".story__stage");
   let frameInset = 12, frameRadius = 20;
   const measureFrame = () => {

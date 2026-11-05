@@ -296,3 +296,9 @@ The supplied bundled-cable material was applied, then rejected by the user and f
 - `drain` is now 2.6 screens. The assembly's red `Wire` instance pulls forward while blue/green hold still; the camera follows. Only afterward do the assembly/background recede and the red path normalize into the existing entry. The final product frame remains matched, and all later product/finale choreography is retained. Total story is 32.05 screens.
 - Installed the user's 29 Emil skills into `~/.codex/skills` (28 new, one replaced with backup). Used `emil-animations` guidance for state continuity, paired easing, reversal, existing stack and reduced motion.
 - Build and desktop/portrait 30-frame integration checks passed in muted Comet, including core count, red identity/movement, stationary other cores, callout bounds/non-overlap, reverse seeks, unchanged fonts and reduced-motion rebuild. Updated finale regression is run separately.
+
+## 38. Hero sentence under the headline, haze removed (2026-11-05)
+
+- The user asked to remove the white cloud behind the hero sentence and move the sentence under the main title.
+- `.hero__haze` is gone. `.hero__lede` now follows the `h1` inside `.hero__head` (top-left), and `.hero__aside` holds only "Talk to us" (bottom-right from 1025px, bottom-left below). The scroll lift applies to the headline, sentence and action separately; the wrapper gets no z-index or opacity, so the tower still layers in front of the headline and the sentence stays above the city canvas.
+- Checked in muted Comet at 1440×900, 1024×768 and 390×844.

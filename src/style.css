@@ -283,8 +283,8 @@ a { color: inherit; text-decoration: none; }
   pointer-events: none;
 }
 
-/* Hero composition inside the frame: headline at the top left under the wordmark, the sentence at
-   the bottom left and the action at the bottom right, held apart by the city. */
+/* Hero composition inside the frame: headline and sentence at the top left under the wordmark,
+   the action at the bottom right, held apart by the city. */
 .hero__copy {
   position: absolute;
   inset: var(--frame-inset) var(--frame-inset) auto;   /* no z-index: its children layer against the city */
@@ -311,48 +311,24 @@ a { color: inherit; text-decoration: none; }
 .hero__title .line { display: block; overflow: hidden; padding-bottom: 0.16em; margin-bottom: -0.16em; }
 .hero__title .line__inner { display: inline-block; }
 
-/* Ground haze behind the sentence: the sharp clay edges would otherwise cut through the text
-   (the reference's video is defocused there). Sky-coloured, so it reads as air, not a panel. */
-.hero__haze {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: 3;                      /* above the city canvas, below the sentence (later in the DOM) */
-  height: 46%;
-  /* centred under the sentence, kept clear of the crown tower */
-  background: radial-gradient(ellipse 400px 220px at calc(var(--hero-x) - var(--frame-inset) + 110px) 100%,
-    color-mix(in oklab, var(--sky-bottom), transparent 4%) 0%,
-    color-mix(in oklab, var(--sky-bottom), transparent 14%) 55%,
-    transparent 100%);
-  pointer-events: none;
-}
-
-/* phones: the sentence crosses the crown tower, so the haze spans the frame's whole lower edge */
-@media (max-width: 1024px) {
-  .hero__haze {
-    height: 34%;
-    background: linear-gradient(to top,
-      color-mix(in oklab, var(--sky-bottom), transparent 10%) 0%,
-      color-mix(in oklab, var(--sky-bottom), transparent 30%) 60%,
-      transparent 100%);
-  }
-}
-
-/* sentence + action: one bottom row from 1025px, stacked below */
+/* the action sits alone at the bottom: right-aligned from 1025px, left below */
 .hero__aside {
   position: relative;
   z-index: 3;                      /* above the city canvas */
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 24px;
+  justify-content: flex-start;
 }
 @media (min-width: 1025px) {
-  .hero__aside { flex-direction: row; align-items: flex-end; justify-content: space-between; }
+  .hero__aside { justify-content: flex-end; }
 }
 
+/* the sentence sits directly under the headline, in the sky; no wrapper z-index, so the
+   headline keeps its place behind the rising tower */
 .hero__lede {
+  position: relative;
+  z-index: 3;                      /* above the city canvas */
   max-width: 30rem;
-  margin: 0;
+  margin: clamp(1rem, 0.7rem + 0.8vw, 1.5rem) 0 0;
   font-size: clamp(1.125rem, 1rem + 0.4vw, 1.5rem);    /* 18 → 24 */
   line-height: 1.25;
   letter-spacing: -0.01em;
