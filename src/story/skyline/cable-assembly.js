@@ -87,7 +87,7 @@ export function createCableAssembly(redWire) {
       redWire.setPath(straight);
       Object.assign(redWire.params,{head:1,tailLen:21,strip:3.4*smooth(.35,.85,explosion),fan:.15*smooth(.3,.85,explosion),glow:0,heat:0,char:0,cut:0});redWire.update();
     }
-    const opacity=1-smooth(.52,.85,extraction);
+    const opacity=1-smooth(.5,.75,extraction);
     group.traverse(o=>{if(o.material){if(o.material.userData.assemblyOpacity===undefined)o.material.userData.assemblyOpacity=o.material.opacity;o.material.transparent=true;o.material.opacity=o.material.userData.assemblyOpacity*opacity;}});
     group.visible=opacity>.001;
     lastExplosion=explosion;lastPoints=points;

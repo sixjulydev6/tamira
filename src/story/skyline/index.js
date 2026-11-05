@@ -193,23 +193,32 @@ export function createSkyline(renderer) {
       else bridgeCamera.copy(camera);
     } else assembly.hide();
   }
+  // Drain: the red core first slides straight out along its own channel (its tail
+  // lengthens, so it stays rooted in the sheath) while the camera travels with the
+  // tip and pushes in, letting the bundle leave the frame. Only then does the core
+  // straighten into the product path and the camera settle on the product view.
+  const PULL=.62,PUSH=.5;
   function updateBridge(t,{points,d0},pose){
     const s=CORE_SCALE,tip=points[points.length-1];
-    const pull=smooth(.03,.56,t),morph=smooth(.42,1,t);
-    const redTip=pose.tip.clone().add(new THREE.Vector3(-.12*pull,.07*pull,.45*pull));
+    const pull=smooth(0,.55,t),morph=smooth(.45,1,t),k=smooth(.4,1,t);
+    const axis=new THREE.Vector3(1,0,0).applyQuaternion(pose.rotation);
+    const slide=axis.clone().multiplyScalar(PULL*pull);
+    const redTip=pose.tip.clone().add(slide);
     const q=pose.rotation.clone().slerp(new THREE.Quaternion().setFromRotationMatrix(rotation),morph);
     const origin=redTip.clone().sub(tip.clone().applyQuaternion(q).multiplyScalar(s));
     bridgeWire.group.position.copy(origin);bridgeWire.group.quaternion.copy(q);bridgeWire.group.scale.setScalar(s);
     bridgeWire.setPath(pose.straight.map((v,i)=>v.lerp(points[i],morph)));
     const productLength=new THREE.CatmullRomCurve3(points,false,'centripetal',.5).getLength();
-    Object.assign(bridgeWire.params,{head:1,tailLen:lerp(21,productLength+30,morph),strip:3.4,fan:lerp(.15,.45,morph),glow:0,cut:0,heat:0,char:0});bridgeWire.update();
+    Object.assign(bridgeWire.params,{head:1,tailLen:lerp(21+PULL*pull/s,productLength+30,morph),strip:3.4,fan:lerp(.15,.45,morph),glow:0,cut:0,heat:0,char:0});bridgeWire.update();
     const map=v=>v.applyQuaternion(q).multiplyScalar(s).add(origin);
     const target=map(new THREE.Vector3()),end=map(new THREE.Vector3(0,0,d0));
-    const k=smooth(0,1,t);
-    const tracking=redTip.clone().sub(pose.tip).multiplyScalar(.85);
-    bridgeCamera.position.copy(camera.position).add(tracking).lerp(end,k);
-    const startLook=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).multiplyScalar(camera.position.distanceTo(new THREE.Vector3(...ENTER))).add(camera.position).add(tracking);
-    bridgeCamera.lookAt(startLook.lerp(target,k));
+    // follow pose: the bundle camera carried along with the slide, pushed toward the red tip
+    const lookDist=camera.position.distanceTo(new THREE.Vector3(...ENTER));
+    const baseLook=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).multiplyScalar(lookDist).add(camera.position);
+    const followPos=camera.position.clone().add(slide).lerp(redTip,PUSH*pull);
+    const followLook=baseLook.add(slide).lerp(redTip.clone().sub(axis.clone().multiplyScalar(.12)),.6*pull);
+    bridgeCamera.position.copy(followPos).lerp(end,k);
+    bridgeCamera.lookAt(followLook.lerp(target,k));
     bridgeCamera.fov=lerp(camera.fov,28,k);bridgeCamera.near=.001;
     if(t<1&&camera.view?.enabled){const v=camera.view;bridgeCamera.setViewOffset(v.fullWidth,v.fullHeight,v.offsetX*(1-k),v.offsetY*(1-k),v.width,v.height);}else bridgeCamera.clearViewOffset();
     bridgeCamera.updateProjectionMatrix();
@@ -221,7 +230,7 @@ export function createSkyline(renderer) {
     renderer.setClearColor('#05070b',1);composer.render();
     if(bundle>0&&entry){
       // Fade only the room/city background, retaining a live red wire on top.
-      const a=smooth(.45,.9,drain);
+      const a=smooth(.5,.9,drain);
       renderer.autoClear=false;
       if(a>0){fadeMaterial.uniforms.uColor.value.set(lastBg);fadeMaterial.uniforms.uAlpha.value=a;renderer.render(fadeScene,fadeCamera);}
       if(S.enter>.12){renderer.clearDepth();renderer.toneMapping=THREE.NeutralToneMapping;renderer.render(bridgeScene,bridgeCamera);}renderer.autoClear=true;
