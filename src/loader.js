@@ -10,8 +10,8 @@ const MIN_SHOWN_MS = 2200;     // a cached visit still reads as a deliberate bea
 const MAX_WAIT_MS = 15000;     // never hold the page: past this the hero shows with its poster
 const MAX_SPEED = 0.55;        // the core never crosses more than 55% of the screen a second
 const EASE_RATE = 3.2;         // per second: how quickly the shown value settles on the real one
-const HOLD_FULL_MS = 350;      // a beat at 100% before the tip runs off
-const RUN_OFF_MS = 900;
+const HOLD_FULL_MS = 80;      // a beat at 100% before the tip runs off
+const RUN_OFF_MS = 600;
 const LIFT_MS = 1300;
 
 export function createLoader(el) {
@@ -40,8 +40,8 @@ export function createLoader(el) {
     const cap = finishing ? 1 : 0.99;
     const goal = Math.min(target, cap);
     // frame-rate independent ease, with a speed limit so a fast (cached) load still glides
-    const step = (goal - shown) * (1 - Math.exp(-EASE_RATE * dt));
-    shown = reduce ? goal : shown + Math.sign(step) * Math.min(Math.abs(step), MAX_SPEED * dt);
+    const step = (goal - shown) * (1 - Math.exp(-(finishing ? EASE_RATE * 4 : EASE_RATE) * dt));   // the last stretch closes quickly once everything is in
+    shown = reduce ? goal : shown + Math.sign(step) * Math.min(Math.abs(step), (finishing ? MAX_SPEED * 3 : MAX_SPEED) * dt);
     if (Math.abs(goal - shown) < (finishing ? 0.004 : 0.0005)) shown = goal;   // no slow crawl from 99.6 to 100
     draw(shown);
     count.textContent = String(Math.round(shown * 100));

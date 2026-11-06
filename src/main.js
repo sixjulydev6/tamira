@@ -256,8 +256,10 @@ function runStory() {
     // hand-over: the product wire's canvas fades in over an identical frame of the city wire
     const wireIn = local(p, "wireIn");
     wireCanvas.style.opacity = String(smooth(0, 0.4, wireIn));
-    wireCanvas.style.visibility = wireIn > 0 ? "visible" : "hidden";
-    canvas.style.visibility = wireIn >= 0.5 ? "hidden" : "";
+    // outro: the city canvas returns under the darkened room, which then fades away
+    const outro = local(p, "outro");
+    wireCanvas.style.visibility = wireIn > 0 && outro === 0 ? "visible" : "hidden";
+    canvas.style.visibility = wireIn >= 0.5 && outro === 0 ? "hidden" : "";
 
     // chapter copy
     for (const c of chapterEls) {

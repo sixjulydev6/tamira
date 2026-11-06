@@ -1,19 +1,5 @@
 import * as THREE from 'three'
 
-// Reads the city texture at low resolution so edges and points can skip foliage.
-export function textureSampler(image, size = 256) {
-  const c = document.createElement('canvas')
-  c.width = c.height = size
-  const g = c.getContext('2d', { willReadFrequently: true })
-  g.drawImage(image, 0, 0, size, size)
-  const data = g.getImageData(0, 0, size, size).data
-  return (u, v) => {
-    const x = Math.min(size - 1, Math.max(0, Math.floor(u * size)))
-    const y = Math.min(size - 1, Math.max(0, Math.floor(v * size)))
-    const i = (y * size + x) * 4
-    return [data[i] / 255, data[i + 1] / 255, data[i + 2] / 255]
-  }
-}
 const isFoliage = ([r, g, b]) => g > r * 1.08 && g > b * 1.02 && g - Math.min(r, b) > 0.05
 
 // Architectural outlines only: creases sharper than `angle`, open borders, no slivers, no trees.
@@ -107,18 +93,3 @@ export function samplePoints(geometry, sample, count = 24000, seed = 3) {
   return g
 }
 
-// 12 edges per filler box, baked to world space.
-export function boxEdges(instanced) {
-  const m = new THREE.Matrix4(), v = new THREE.Vector3()
-  const corners = [[-0.5, 0, -0.5], [0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5], [-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]]
-  const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]
-  const out = []
-  for (let i = 0; i < instanced.count; i++) {
-    instanced.getMatrixAt(i, m)
-    const w = corners.map(cn => v.set(...cn).applyMatrix4(m).toArray())
-    for (const [p, q] of E) out.push(...w[p], ...w[q])
-  }
-  const g = new THREE.BufferGeometry()
-  g.setAttribute('position', new THREE.Float32BufferAttribute(out, 3))
-  return g
-}

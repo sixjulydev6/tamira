@@ -5,6 +5,17 @@ import { rng } from './layout.js'
 // A hazy outer city beyond the modelled district so the skyline sits inside a metropolis
 // rather than on an empty plane. Facades are storey bands drawn in the shader (no atlas
 // patches); nothing is placed in the opening sightline, and nothing is taller than the tower.
+// A real city's buildings span concrete greys, sandstone, brick and dark-clad towers; all-pale blocks read as
+// white foam models in the haze. Weighted palette (linear-ish HSL), each with a little jitter.
+function tone(r, c) {
+  const k = r()
+  if (k < 0.34) return c.setHSL(0.08 + r() * 0.04, 0.05 + r() * 0.04, 0.3 + r() * 0.12)    // warm grey concrete
+  if (k < 0.58) return c.setHSL(0.58 + r() * 0.04, 0.04 + r() * 0.03, 0.28 + r() * 0.12)   // cool grey / panel
+  if (k < 0.76) return c.setHSL(0.09 + r() * 0.03, 0.16 + r() * 0.08, 0.34 + r() * 0.1)    // sandstone / beige
+  if (k < 0.88) return c.setHSL(0.03 + r() * 0.03, 0.28 + r() * 0.1, 0.22 + r() * 0.08)    // brick
+  return c.setHSL(0.6, 0.05, 0.13 + r() * 0.08)                                            // dark-clad
+}
+
 export function createFiller(envMap, count = 300) {
   const mesh = buildOnce(() => {
     const r = rng(7)
@@ -23,7 +34,7 @@ export function createFiller(envMap, count = 300) {
         const w = 22 + r() * 22, d = 20 + r() * 20, h = 5 + r() * 10 * (r() < 0.15 ? 2 : 1)
         m.compose(new THREE.Vector3(gx + r() * 8, 0, gz + r() * 8), new THREE.Quaternion(), new THREE.Vector3(w, h, d))
         mesh.setMatrixAt(i, m)
-        mesh.setColorAt(i, c.setHSL(0.08, 0.07, 0.36 + r() * 0.14))
+        mesh.setColorAt(i, tone(r, c))
         i++
       }
     }
@@ -41,8 +52,7 @@ export function createFiller(envMap, count = 300) {
       const w = 20 + r() * 28, d = 20 + r() * 28
       m.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(w, h, d))
       mesh.setMatrixAt(i, m)
-      c.setHSL(0.07 + r() * 0.5, 0.05, 0.38 + r() * 0.16)
-      mesh.setColorAt(i, c)
+      mesh.setColorAt(i, tone(r, c))
       i++
     }
     mesh.count = i

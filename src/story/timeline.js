@@ -22,6 +22,7 @@ export const SEGMENTS = [
   { id: "smoke",   screens: 1.3 },
   { id: "finale",  screens: 4.0 }, // single cable connection and original camera arc to the front
   { id: "room",    screens: 3.0 }, // original room pullback, five lighting steps, fade to close
+  { id: "outro",   screens: 3.0 }, // back out of the tower room to the hero tower at sunset; the contact section rises over it
 ];
 
 export const TOTAL_SCREENS = SEGMENTS.reduce((sum, s) => sum + s.screens, 0);
@@ -37,12 +38,6 @@ export const local = (p, id) => clamp01((p - STARTS[id]) / SPANS[id]);
 
 /** overall progress for a point t (0–1) inside segment id */
 export const progressOf = (id, t) => STARTS[id] + SPANS[id] * t;
-
-/** The segment p currently sits in. */
-export const segmentAt = (p) => {
-  for (let i = SEGMENTS.length - 1; i >= 0; i--) if (p >= STARTS[SEGMENTS[i].id]) return SEGMENTS[i].id;
-  return SEGMENTS[0].id;
-};
 
 export const clamp01 = (x) => Math.min(1, Math.max(0, x));
 export const lerp = (a, b, t) => a + (b - a) * t;

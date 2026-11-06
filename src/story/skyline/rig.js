@@ -19,11 +19,37 @@ const KEYS = [
   { t: [70, 6, 30], az: 36, el: 30, d: 450, fov: 36, ox: 0.12, pt: [72, 10, 30], pd: 640 }                 // 03 the network
 ]
 
+// Monotone cubic Hermite (Fritsch-Carlson) through values at x = 0, 1, 2, ...: C1-continuous, no overshoot.
+function monotone(ys) {
+  const n = ys.length, d = [], m = new Array(n)
+  for (let k = 0; k < n - 1; k++) d.push(ys[k + 1] - ys[k])
+  m[0] = d[0]; m[n - 1] = d[n - 2]
+  for (let k = 1; k < n - 1; k++) m[k] = d[k - 1] * d[k] <= 0 ? 0 : (d[k - 1] + d[k]) / 2
+  for (let k = 0; k < n - 1; k++) {
+    if (d[k] === 0) { m[k] = m[k + 1] = 0; continue }
+    const a = m[k] / d[k], b = m[k + 1] / d[k], h = a * a + b * b
+    if (h > 9) { const s = 3 / Math.sqrt(h); m[k] = s * a * d[k]; m[k + 1] = s * b * d[k] }
+  }
+  return (x) => {
+    const k = Math.min(n - 2, Math.max(0, Math.floor(x))), u = Math.min(1, Math.max(0, x - k))
+    const u2 = u * u, u3 = u2 * u
+    return (2 * u3 - 3 * u2 + 1) * ys[k] + (u3 - 2 * u2 + u) * m[k] + (-2 * u3 + 3 * u2) * ys[k + 1] + (u3 - u2) * m[k + 1]
+  }
+}
+const keyCurves = (portrait) => ({
+  t: [0, 1, 2].map(j => monotone(KEYS.map(K => (portrait && K.pt ? K.pt : K.t)[j]))),
+  az: monotone(KEYS.map(K => K.az)), el: monotone(KEYS.map(K => K.el)),
+  d: monotone(KEYS.map(K => portrait && K.pd ? K.pd : K.d)),
+  fov: monotone(KEYS.map(K => K.fov)), ox: monotone(KEYS.map(K => K.ox)),
+  poy: monotone(KEYS.map(K => K.poy ?? -0.05)),
+})
+const KEY_CURVES = { landscape: keyCurves(false), portrait: keyCurves(true) }
+
 const yc = ceilY(SINGLE.floor)
 const [RX, RZ] = RISER
 // 04: climb the tower alongside the wire as it is drawn up the riser to the room
 // close enough that the room fills the frame, low enough to look in under its ceiling
-const ROOM_VIEW = { pos: [96.5, yc - 1.95, 58.5], tgt: [84.5, yc - 0.95, 38.5] }
+export const ROOM_VIEW = { pos: [96.5, yc - 1.95, 58.5], tgt: [84.5, yc - 0.95, 38.5] }
 const CLIMB_POS = [[172, 58, 130], [128, 100, 98], ROOM_VIEW.pos]
 const CLIMB_TGT = [[RX, 22, RZ], [RX, 86, RZ], ROOM_VIEW.tgt]
 
@@ -37,8 +63,17 @@ const FOLLOW_TGT = [
   ROOM_VIEW.tgt, [82, yc - 0.3, 33.6], [80.6, yc, RZ + 0.2],
   [86.5, yc, 33.4], [86.5, yc, 35.1], [ENTER[0], ENTER[1], ENTER[2]]
 ].map(p => new THREE.Vector3(...p))
-const followPos = new THREE.CatmullRomCurve3(FOLLOW_POS, false, 'centripetal')
-const followTgt = new THREE.CatmullRomCurve3(FOLLOW_TGT, false, 'centripetal')
+const followTgt = new THREE.CatmullRomCurve3(FOLLOW_TGT, false, 'centripetal') // the wire's glowing head walks this path
+// The camera's own move into the room: straight in, then a turn.
+//  1. a straight dolly from the room view, heading held, rising toward the ceiling, to a point level with the
+//     wire's end and 1.6 m off its side;
+//  2. a turn in place until the camera faces the wire side-on;
+//  3. a straight push in to the close-up the bundle shot starts from.
+const FINAL_POS = FOLLOW_POS[FOLLOW_POS.length - 1], FINAL_TGT = FOLLOW_TGT[FOLLOW_TGT.length - 1]
+// the turn ends 1.3 m back on the close-up's own line of sight, so the push in is a straight dolly
+const DOLLY_END = FINAL_POS.clone().addScaledVector(FINAL_TGT.clone().sub(FINAL_POS).normalize(), -1.3)
+// follow-progress windows; neighbours overlap a little so the move never stops dead
+const STRAIGHT = [0, 0.5], TURN = [0.42, 0.82], PUSH = [0.72, 1]
 
 function spherical(k, out) {
   const a = k.az * D2R, e = k.el * D2R
@@ -49,7 +84,8 @@ export function createRig(camera, size) {
   const tmp = buildOnce(() => ({
     key: { t: [0, 0, 0], az: 0, el: 0, d: 0, fov: 30, ox: 0 },
     pos: new THREE.Vector3(), tgt: new THREE.Vector3(), p2: new THREE.Vector3(), t2: new THREE.Vector3(),
-    sPos: new THREE.Vector3(), sTgt: new THREE.Vector3(), first: true, fov: 30, ox: 0, oy: 0,
+    sPos: new THREE.Vector3(), sTgt: new THREE.Vector3(),
+    d0: new THREE.Vector3(), d1: new THREE.Vector3(), d2: new THREE.Vector3(), d3: new THREE.Vector3(), q: new THREE.Quaternion(), qi: new THREE.Quaternion(), first: true, fov: 30, ox: 0, oy: 0,
     climb: null, climbPortrait: null
   }), [])
 
@@ -69,15 +105,14 @@ export function createRig(camera, size) {
     if (!live.dragging) { look.dx *= Math.exp(-dt * 0.8); look.dy *= Math.exp(-dt * 0.8) }
 
     /* ---------- establishing shots */
+    // One continuous move through the key shots: monotone cubic per value, so the camera flows through each
+    // shot instead of easing to a stop at every key (which read as the scroll pausing), and never overshoots
+    // a framing between unevenly spaced keys. Easing in from the still hero and out at the network shot is
+    // done once, on the whole move, in index.js (S.cam).
     const c = THREE.MathUtils.clamp(S.cam, 0, KEYS.length - 1)
-    const i = Math.min(KEYS.length - 2, Math.floor(c))
-    const f = eio(c - i)
-    const A = KEYS[i], B = KEYS[i + 1], k = tmp.key
-    const At = portrait && A.pt ? A.pt : A.t, Bt = portrait && B.pt ? B.pt : B.t
-    for (let j = 0; j < 3; j++) k.t[j] = lerp(At[j], Bt[j], f)
-    k.az = lerp(A.az, B.az, f); k.el = lerp(A.el, B.el, f)
-    k.d = lerp(portrait && A.pd ? A.pd : A.d, portrait && B.pd ? B.pd : B.d, f)
-    k.fov = lerp(A.fov, B.fov, f); k.ox = lerp(A.ox, B.ox, f)
+    const curves = portrait ? KEY_CURVES.portrait : KEY_CURVES.landscape, k = tmp.key
+    for (let j = 0; j < 3; j++) k.t[j] = curves.t[j](c)
+    k.az = curves.az(c); k.el = curves.el(c); k.d = curves.d(c); k.fov = curves.fov(c); k.ox = curves.ox(c)
     if (!portrait && aspect < 1.3) k.d *= 1.15 // tablets: keep the subject's margins
     k.az += (look.sx * 1.8 + look.dx) + Math.sin(t * 0.11) * 0.35 * breathe
     k.el += (look.sy * 1.0 + look.dy) + Math.sin(t * 0.07) * 0.2 * breathe
@@ -85,7 +120,7 @@ export function createRig(camera, size) {
     tmp.tgt.set(k.t[0], k.t[1], k.t[2])
     let fov = k.fov * (portrait ? 1.3 : 1)
     // portrait lens shift: positive drops the scene below the type, negative lifts it above the copy
-    const poy = lerp(A.poy ?? -0.05, B.poy ?? -0.05, f)
+    const poy = curves.poy(c)
     let ox = portrait ? 0 : k.ox, oy = portrait ? poy : 0
 
     /* ---------- 04: climb the tower with the wire */
@@ -120,22 +155,33 @@ export function createRig(camera, size) {
 
     /* ---------- 05: ride the wire into the room */
     if (S.follow > 0) {
-      const u = ease(S.follow)
-      followPos.getPoint(u, tmp.p2)
-      followTgt.getPoint(u, tmp.t2)
-      if (portrait && u < 0.25) {
-        // phones started the climb further back; ease into the shared path
-        const back = (1 - u / 0.25) * 1.1
-        tmp.p2.sub(tmp.t2).multiplyScalar(1 + back).add(tmp.t2)
-      }
-      tmp.pos.copy(tmp.p2)
-      tmp.tgt.copy(tmp.t2)
+      const f = S.follow
+      followTgt.getPoint(ease(f), tmp.t2) // the wire head keeps travelling the wire
+      WIRE_U.uHead.value.copy(tmp.t2)
+      // start exactly where the climb ended (phones end it further back along the same line)
+      const start = tmp.p2.set(...ROOM_VIEW.pos)
+      if (portrait) start.sub(FOLLOW_TGT[0]).multiplyScalar(2.1).add(FOLLOW_TGT[0])
+      const d0 = tmp.d0.copy(FOLLOW_TGT[0]).sub(start).normalize()
+      const travel = tmp.d1.copy(DOLLY_END).sub(start).normalize()
+      const dEnd = tmp.d2.copy(FINAL_TGT).sub(FINAL_POS)
+      const endDist = dEnd.length(); dEnd.normalize()
+      const win = ([x0, x1]) => eio(THREE.MathUtils.clamp((f - x0) / (x1 - x0), 0, 1))
+      const a = win(STRAIGHT), b = win(TURN), c = win(PUSH)
+      // position: straight line in, (hold while turning), straight push to the close-up
+      tmp.pos.copy(start).lerp(DOLLY_END, a).lerp(FINAL_POS, c)
+      // heading: settle onto the line of travel, then turn onto the wire
+      const dir = tmp.d3.copy(d0).lerp(travel, smooth(f, 0, STRAIGHT[1] * 0.6)).normalize()
+      tmp.q.setFromUnitVectors(travel, dEnd)
+      dir.applyQuaternion(tmp.qi.identity().slerp(tmp.q, b))
+      // after the turn the camera looks straight at the wire's end, so the push runs along its own view line
+      const lookDist = b < 1 ? lerp(start.distanceTo(FOLLOW_TGT[0]), DOLLY_END.distanceTo(FINAL_TGT), b) : tmp.pos.distanceTo(FINAL_TGT)
+      tmp.tgt.copy(tmp.pos).addScaledVector(dir, Math.max(lookDist, endDist))
+      if (c >= 1) tmp.tgt.copy(FINAL_TGT) // land exactly on the bundle shot's first frame
       const close = smooth(S.follow, 0.4, 1)
       fov = lerp(portrait ? 50 : 38, portrait ? 52 : 42, close)
       ox = lerp(portrait ? 0 : 0.14, 0, smooth(S.follow, 0, 0.35)); oy = lerp(portrait ? -0.06 : 0, 0, smooth(S.follow, 0, 0.35))
       const sway = (1 - close) * 0.5
       tmp.pos.x += look.sx * sway; tmp.pos.y += look.sy * sway * 0.6
-      WIRE_U.uHead.value.copy(tmp.t2)
       WIRE_U.uHeadOn.value = smooth(S.follow, 0, 0.1)
     } else {
       WIRE_U.uHeadOn.value = 0
@@ -145,7 +191,9 @@ export function createRig(camera, size) {
     if (S.enter > 0) {
       const e = ease(S.enter), x = eio(S.explode)
       // orbit from the wire's side toward its cut end: the stepped layers open to the right
-      const phi = lerp(180, 128, x) * D2R, el = lerp(0, 16, x) * D2R
+      // as the cut opens the camera already eases a little toward the near piece's cut face (same end pose)
+      const opening = (S.part || 0) * (S.part || 0) * (3 - 2 * (S.part || 0))
+      const phi = lerp(180 - 16 * opening, 128, x) * D2R, el = lerp(4 * opening, 16, x) * D2R
       const dist = lerp(CLOSE, portrait ? 1.6 : 1.2, smooth(S.explode, 0, 1))
       tmp.t2.set(ENTER[0], ENTER[1], ENTER[2] - 0.2 * x)
       tmp.p2.set(Math.cos(phi) * Math.cos(el), Math.sin(el), Math.sin(phi) * Math.cos(el)).multiplyScalar(dist).add(tmp.t2)
@@ -176,7 +224,8 @@ export function createRig(camera, size) {
     camera.setViewOffset(W, H, -tmp.ox * W, -tmp.oy * H, W, H)
     camera.updateProjectionMatrix()
   };
-  return {update}
+  // the damped pose the rig last wrote (the outro blends from the room view into it)
+  return { update, get pose() { return { tgt: tmp.sTgt, fov: tmp.fov, ox: tmp.ox, oy: tmp.oy } } }
 }
 
 function buildOnce(fn){return fn();}

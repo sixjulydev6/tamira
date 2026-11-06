@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { buildRoom, ROOM, ROOM_LIGHTS } from './building.js'
 import { CITY_U } from './cityMaterial.js'
 import { FLOOR } from './layout.js'
@@ -12,6 +13,7 @@ const smooth = THREE.MathUtils.smoothstep
 export const ROOM_U = {
   uTime: CITY_U.uTime,
   uBuild: { value: 0 },
+  uFade: { value: 0 },
   uOn: { value: 0 },
   uDimI: { value: 0 },
   uY0: { value: ROOM.yb },
@@ -24,10 +26,13 @@ export const ROOM_U = {
 
 const ROOM_FRAG_TOP = /* glsl */ `
 varying vec3 vIW; varying vec3 vIWN;
-uniform float uBuild; uniform float uOn; uniform float uDimI; uniform float uY0; uniform float uH;
+uniform float uBuild; uniform float uFade; uniform float uOn; uniform float uDimI; uniform float uY0; uniform float uH;
 uniform vec3 uL1; uniform vec3 uL2; uniform vec3 uL3;
 `
+// The room dissolves in (screen-space interleaved gradient noise, stable per pixel) while it builds,
+// so the floor slab, a flat plane the rising build front reveals all at once, never pops in.
 const BUILD_DISCARD = /* glsl */ `
+  if (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715)))) >= uFade) discard;
   float r_h = vIW.y - (uY0 - .4);
   float r_front = uBuild * (uH + .9);
   if (r_h > r_front) discard;
@@ -40,8 +45,13 @@ const ROOM_LIGHT = /* glsl */ `
   vec3 L2 = uL2 - vIW; float f2 = 1. / (1. + dot(L2, L2) * .22); float d2 = max(dot(n, normalize(L2)), 0.) * .75 + .25;
   vec3 L3 = uL3 - vIW; float f3 = 1. / (1. + dot(L3, L3) * .3); float d3 = max(dot(n, normalize(L3)), 0.) * .75 + .25;
   vec3 warm = vec3(1., .77, .52);
-  totalEmissiveRadiance += diffuseColor.rgb * (warm * (f1 * d1 * 2.9 + f2 * d2 * 1.5 + f3 * d3 * 1.6) * uOn + vec3(.03, .04, .07));
-  totalEmissiveRadiance += vec3(1., .62, .3) * r_edge * 3.;
+  // interior lamps light the room only: the slab's outer underside and edges (below the floor surface)
+  // stay dark instead of glowing cream when the lights come up
+  float r_in = smoothstep(uY0 - .12, uY0 - .02, vIW.y);
+  totalEmissiveRadiance += diffuseColor.rgb * (warm * (f1 * d1 * 2.9 + f2 * d2 * 1.5 + f3 * d3 * 1.6) * uOn * r_in + vec3(.03, .04, .07));
+  // the build front glows on walls only: on a floor or ceiling face the whole plane sits at the front's
+  // height at once and flashed the slab underside (bloomed to a bright square)
+  totalEmissiveRadiance += vec3(1., .62, .3) * r_edge * 3. * (1. - smoothstep(.5, .9, abs(n.y)));
 }
 `
 
@@ -79,6 +89,27 @@ function patchRoom(material, curtains = false) {
   return material
 }
 
+// Unlit fittings (MeshBasic: lamp shades, light panels) follow the same dissolve and build front;
+// otherwise they show, black, before the room around them exists.
+function patchGlow(material) {
+  material.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, ROOM_U)
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vIW;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 g_w = vec4(transformed, 1.);
+        #ifdef USE_INSTANCING
+          g_w = instanceMatrix * g_w;
+        #endif
+        vIW = (modelMatrix * g_w).xyz;`)
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vIW; uniform float uBuild; uniform float uFade; uniform float uY0; uniform float uH;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + BUILD_DISCARD)
+  }
+  material.customProgramCacheKey = () => 'temira-room-glow'
+  return material
+}
+
 export function createTowerRoom() {
   const group = new THREE.Group()
   const { solid, glow, curtain, glowMat, outline } = buildOnce(() => {
@@ -92,7 +123,7 @@ export function createTowerRoom() {
       solid.setColorAt(i, c.setRGB(b[6], b[7], b[8], THREE.SRGBColorSpace))
     })
 
-    const glowMat = new THREE.MeshBasicMaterial({ color: '#000000', toneMapped: false })
+    const glowMat = patchGlow(new THREE.MeshBasicMaterial({ color: '#000000', toneMapped: false }))
     const glow = new THREE.InstancedMesh(box, glowMat, data.glows.length)
     data.glows.forEach((b, i) => {
       glow.setMatrixAt(i, m.compose(p.set(b[0], b[1], b[2]), q.identity(), s.set(b[3], b[4], b[5])))
@@ -120,24 +151,31 @@ export function createTowerRoom() {
   let glows = [{ mat: glowMat, base: new THREE.Color(1, 1, 1) }]
   let source = 'box', disposed = false
   const update = () => {
-    ROOM_U.uBuild.value = smooth(S.room, 0, 0.75)
-    const on = smooth(S.room, 0.65, 1)
+    // 2026-11-06 user direction: the room is there from the start of the climb (no late build-up from the
+    // floor): it dissolves in over the first stretch while it is still small in frame, and its lights warm
+    // up gradually across the climb instead of switching on near the end.
+    ROOM_U.uBuild.value = 1
+    // outro: the room is there, lit, as the camera backs out, then dissolves as the tower turns solid
+    const out = S.outro > 0
+    ROOM_U.uFade.value = (out ? S.outroRoom : smooth(S.climb, 0, 0.12)) * 1.001 // >1 at the end so no pixel stays dissolved
+    const on = out ? 1 : smooth(S.climb, 0.2, 0.95)
     ROOM_U.uOn.value = on
     ROOM_U.uDimI.value = smooth(S.enter, 0.1, 0.7) * 0.25 + smooth(S.explode, 0.1, 0.6) * 0.5
     const k = on * (1 - ROOM_U.uDimI.value * 0.7)
     for (const g of glows) g.mat.color.copy(g.base).multiplyScalar(k)
-    outline.material.opacity = smooth(S.room, 0.05, 0.4) * (1 - smooth(S.follow, 0.15, 0.4)) * 0.9
-    group.visible = S.room > 0.001
+    outline.material.opacity = out ? 0 : smooth(S.climb, 0, 0.3) * (1 - smooth(S.follow, 0.15, 0.4)) * 0.9
+    group.visible = out ? S.outroRoom > 0.001 : S.climb > 0.001
   };
   group.add(solid,glow,curtain,outline);
 
   // Modelled room (art/blender/room/build_room.py -> room-v2.glb), authored in the same world frame.
   // Replaces the box room once loaded; on failure the box room stays.
-  const load = url => new GLTFLoader().loadAsync(url + 'room-v2.glb').then(gltf => {
+  const load = url => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url + 'room-v2.glb').then(gltf => {
     if (disposed) { gltf.scene.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.() }); return }
-    const made = new Map(), nextGlows = [], tl = new THREE.TextureLoader()
+    const made = new Map(), nextGlows = [], tl = new THREE.TextureLoader(), texLoads = []
     const tex = (path, srgb) => {
-      const t = tl.load(path + '.jpg')
+      let done; texLoads.push(new Promise(r => { done = r }))
+      const t = tl.load(path, () => done(), undefined, () => done())
       t.wrapS = t.wrapT = THREE.RepeatWrapping
       t.anisotropy = 8
       if (srgb) t.colorSpace = THREE.SRGBColorSpace
@@ -150,20 +188,20 @@ export function createTowerRoom() {
       if (/^light_|^fabric_shade/.test(name)) {
         // emissive fittings: unlit, brightness follows the room's lights-on fade
         const strength = src.userData?.emissiveStrength ?? src.emissiveIntensity ?? 1
-        m = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, side: THREE.DoubleSide })
+        m = patchGlow(new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, side: THREE.DoubleSide }))
         nextGlows.push({ mat: m, base: src.emissive.clone().multiplyScalar(Math.min(strength, 14) * (name.startsWith('fabric') ? 0.9 : 0.45)) })
       } else if (name === 'wood_floorash') {
         // Poliigon Wood Floor Ash 4186; the floor's UVs count texture repeats (2 m each)
         const dir = url + 'tex/wood-floor-ash/ash_'
         m = patchRoom(new THREE.MeshStandardMaterial({
-          map: tex(dir + 'BaseColor', true), roughnessMap: tex(dir + 'Roughness'), normalMap: tex(dir + 'Normal'), roughness: 1, metalness: 0
+          map: tex(dir + 'BaseColor.webp', true), roughnessMap: tex(dir + 'Roughness.webp'), normalMap: tex(dir + 'Normal.webp'), roughness: 1, metalness: 0
         }))
       } else if (name === 'fabric_curtain') {
         // Poliigon Fabric Plain Natural Sheer 009; UVs count repeats (0.4 m of cloth each). The mask is
         // the open weave with a 35% floor baked in, so the sheers stay readable but let the room through.
         const dir = url + 'tex/fabric-sheer/sheer_'
         m = patchRoom(new THREE.MeshStandardMaterial({
-          map: tex(dir + 'COL', true), normalMap: tex(dir + 'NRM'), alphaMap: tex(dir + 'MASK'),
+          map: tex(dir + 'COL.jpg', true), normalMap: tex(dir + 'NRM.jpg'), alphaMap: tex(dir + 'MASK.jpg'),
           transparent: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide
         }))
       } else {
@@ -182,6 +220,9 @@ export function createTowerRoom() {
     glows = nextGlows
     source = 'glb'
     update()
+    // resolve once the room's textures are in too, so the caller can upload them to the GPU ahead of the
+    // climb instead of on the first frame the room is seen
+    return Promise.all(texLoads)
   }).catch(e => console.warn('Modelled tower room unavailable; keeping the box room', e))
 
   return { group, update, load, dispose() { disposed = true }, get source() { return source } };

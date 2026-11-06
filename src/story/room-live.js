@@ -51,9 +51,9 @@ export function createLiveRoom(element) {
     if (ready && u > 6.85) render(u);
     // Never cover the matched live board with an empty canvas while the room is still loading.
     const opacity = ready ? smooth(6.99, 7.06, u) : 0;
-    element.style.opacity = String(opacity);
-    element.style.visibility = opacity > 0 ? 'visible' : 'hidden';
-    element.style.setProperty('--room-end', smooth(7.74, 7.94, u));
+    element.style.opacity = String(opacity*(1-smooth(0,.07,local(p,'outro'))));
+    element.style.visibility = opacity > 0 && local(p, 'outro') < .07 ? 'visible' : 'hidden';
+    element.style.setProperty('--room-end','0'); // no fade to black: the outro crossfades from the lit room to the city (user direction)
     element.dataset.frame = frameFor(innerWidth / Math.max(1, innerHeight));
     element.dataset.mode = 'glb';
   }

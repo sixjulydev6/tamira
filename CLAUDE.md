@@ -6,6 +6,35 @@ Read [docs/CURRENT-CONTEXT.md](docs/CURRENT-CONTEXT.md) first. Updated 2026-11-0
 
 The current opener is the supplied GLB skyline → dusk → architectural scan → underground network → tower room → ceiling wire sequence, adapted to vanilla Three.js in `src/story/skyline/`. It now includes a `bundle` construction reveal with red/blue/green cores; the same red core physically pulls out during `drain` and leads into the unchanged single-core product story (DECISIONS 37). Preserve the existing fonts, header, frame and copy layout. Read `docs/SKYLINE-HERO.md`. The clay-city instructions below are historical and do not override this replacement.
 
+## Room approach camera (2026-11-06, user direction)
+
+The `approach` segment no longer follows two Catmull-Rom splines (that swung the view up and diagonally across the ceiling). `skyline/rig.js` now does: a straight, level dolly in from the room view; a turn in place to face the wire side-on, 1.3 m back on the close-up's sight line; a straight push in to the close-up. The end frame is unchanged, so the bundle shot still starts seamlessly. The wire's glowing head still walks the old `FOLLOW_TGT` path.
+
+## Cable realism (2026-11-06, user direction)
+
+The cut → bundle → red-core sequence was reading as flat/2D. Now (`skyline/cable-assembly.js`, `wire.js`):
+- The far piece springs away and sags slightly as it parts (`far.position/rotation` from `part`), turning its new cut face toward the camera; that face is a real cross-section (sheath ring, filler, three insulated cores with packed copper). The camera eases ~16° toward the near cut face while the cut opens (`rig.js`, same end pose).
+- Inner bedding is opaque matte filler (was a transparent glass tube); its cut face is a solid disc with the three cores through it.
+- Sheath: satin PVC with a faint extrusion normal map and a real-style legend (`3 CORE 1.5 SQ MM HR-FR-LSH 1100 V`). Keep the normal scale tiny; at this zoom anything above ~0.04 shows bands.
+- Copper (shared by all product chapters): 10-sided round strands, per-strand gauge/tone variation (vertex colours), solid domed cut ends.
+
+## Hero city realism, materials only (2026-11-06, user direction)
+
+Lighting/post (`TUNE` in `skyline/index.js`, `atmosphere.js`) is tuned separately in the `?gui` panel; these changes are surface-only, in `skyline/cityMaterial.js` and `skyline/filler.js`:
+- Curtain-wall glass: each 1.2 m x 3.6 m pane (focal tower's mullion grid, phase 0.775) gets its own small tilt and a roller-wave ripple; vertical glass reflects the real sky (`tSky`) with Schlick Fresnel (16% head-on), the city below the horizon. Fades out with `uNight` and `uXray`. Focal-tower panes vary slightly in tint/gloss; about one in twenty shows blinds.
+- `metal_alu` (mullions) is anodised mid-grey (0.5, rough 0.5) instead of mirror silver, which drew a bright white grid.
+- Filler blocks: three facade types (ribbon, punched, curtain wall), per-building window module, per-window glass variation, shopfront ground floor, glass gloss; a weighted palette of real building tones instead of all pale.
+- `grass_lawn`: lush/dry patches, diagonal mowing stripes, fine grain (fades with pixel footprint), slightly muted green.
+- Weathering on every opaque city surface (`WEATHER`): rain streaks, street-level dirt, per-face tone, patchy roofs; grime raises roughness. Glass and foliage stay clean. Facade-image glass gets pane tilt/sky reflection only on its dark (glass) pixels (`FACADE_GLASS_MASK`), so panels stay matte. `paint_road` is weathered off-white.
+
+## Scroll smoothness (2026-11-06)
+
+- City canvas capped at 1.5x DPR (product canvas 1.75x) and adaptive: sustained missed frames step it to 1.25x, then 1x, applied only when the scroll pauses (resize reallocates targets), with an immediate redraw so the cleared canvas never shows. Never steps back up. `scene.js` `watchFrame`.
+- First-pass freezes came from work done on first sight. `skyline/index.js` `warmUp()` (idle, after the room loads) compiles each scene in the exact state it is drawn (composer target, crossfade target, screen with Neutral/TUNE tone mapping), uploads every texture and allocates the crossfade target. Room GLB `load()` now resolves after its textures. Assembly materials are `transparent` from creation (flipping it later recompiles).
+- The red core's tube is rebuilt only when its inputs change (`cable-assembly.js`), not every ambient tick. Leaves skip the night-window block; glass/weathering code compiles only into the materials that use it.
+- Camera hero → network is ONE eased move (`S.cam` = cosine ease of rise+scan+net in key space) and `rig.js` passes through the key shots on monotone cubic curves (no overshoot). Per-move easing used to stop the camera at every key: 38% of that scroll moved at <10% of average speed.
+- Perf scripts used: wheel-driven frame timing per segment, first vs second pass. GPU contention on this machine made single runs noisy; compare interleaved runs.
+
 ## Historical direction to preserve after the product handover
 
 - Live clay city/camera rise and traffic in Three.js, warm orange wireframe, avenue power-up, continuous city-to-product handover.
@@ -32,8 +61,6 @@ Plain HTML/CSS/JavaScript, Vite 5.4.10, GSAP/ScrollTrigger 3.12.5, Lenis 1.3.27,
 | --- | --- |
 | `src/main.js` | Labeled master timeline, lifecycle, copy/palette/overlays, daylight traffic ticker |
 | `src/story/timeline.js` | Segment order/pacing and normalized progress helpers |
-| `src/story/daylight.js` | Procedural clay city, rise camera, traffic, shadows |
-| `src/story/city.js` | Wireframe city, avenue, windows and lamps |
 | `src/story/scene.js` | Two renderers, city/product handover, wire chapter states and finale orchestration |
 | `src/story/wire.js`, `props.js` | Cable geometry/materials and chapter props |
 | `src/story/finale-stage.js` | Shared product scene/cable, original red rail, camera arc and board-to-room frustum |
@@ -43,13 +70,24 @@ Plain HTML/CSS/JavaScript, Vite 5.4.10, GSAP/ScrollTrigger 3.12.5, Lenis 1.3.27,
 | `art/data/city-layout.json` | Shared city layout, Z-up metres |
 | `src/style.css` | Georgia headings, Instrument Sans copy, actual Tamira SVG logo, responsive layout |
 
-Story total: 26.85 scrolling screens plus the sticky stage viewport; `finale` 4 screens and `room` 3. Story movement is deterministic from progress; daylight traffic is ambient ticker motion. GSAP matchMedia owns reduced-motion teardown/rebuild.
+Story total: 35.05 scrolling screens plus the sticky stage viewport; `finale` 4 screens, `room` 3 and `outro` 3 (back out of the tower room to the hero tower at sunset; the contact section overlaps that last screen). Story movement is deterministic from progress; daylight traffic is ambient ticker motion. GSAP matchMedia owns reduced-motion teardown/rebuild.
 
 ## Critical regression context
 
 The board was hidden every frame by `finaleStage.hide()` while the smoke endpoint was reconstructed. The source `createFinale.update()` originally restored visibility only when its fade changed. With constant fade 1, that left the board invisible. The fix restores `group.visible` every update, outside the material-fade cache. Preserve that fix and the new `boardVisible` diagnostic/assertion.
 
 Latest build passed. Earlier desktop/mobile automation passed room alignment, lighting, one-wire identity and opacity, but missed board visibility. The expanded visibility assertion has not completed a post-fix run. Comet review timed out; rear-board visual confirmation remains open. Real-device profiling and product/contact placeholders remain open.
+
+## Load performance (2026-11-06)
+
+Chrome's Slow 4G preset (180 KB/s, 562 ms): loader gone at ~10.4 s (was ~50 s+); full story ~2.3 MB transferred (was ~11 MB). What changed, so it is not undone:
+- `city-v2.glb` is **meshopt-compressed** with 16-bit positions and 8-bit normals (5.3 MB to 1.2 MB raw, 0.22 MB brotli; screenshot diff vs float is below animation noise). `room-v2.glb` keeps float positions, 10-bit normals (0.55 MB). Both loaders call `setMeshoptDecoder`. The scan proxy in `skyline/index.js` takes a float copy of the quantized (interleaved int16) positions before `applyMatrix4`; keep that if the GLB is re-exported.
+- City/room textures and the hero posters are WebP (q90 colour, q95 data maps); the sheer-curtain JPGs stay (WebP did not help).
+- `vite.config.js` makes `npm run dev`/`preview` serve `.glb`/`.hdr` brotli-compressed like the production host, so local Slow 4G tests match the deployed site. Loader finish is shorter (`src/loader.js`).
+- The sky HDRI is `day-env-512.hdr` (was 1k, 1.3 MB; now 0.4 MB, frame diff vs 1k is below animation noise). It downloads in parallel with the GLB; the opening waits for GLB + HDRI + first-view textures (12 s cap) so nothing pops in under the reveal. The room GLB and its textures load only after the opening is up.
+- `index.html` preloads the GLB, HDRI and first-view textures with `fetchpriority="low"` and matching `crossorigin` (without `crossorigin`, the textures download twice). Textures are de-duplicated per file in `skyline/index.js`.
+- Instrument Sans is self-hosted (`public/fonts`); Google Fonts is gone. `vercel.json` sets long cache headers.
+- Removed as unused: `public/media/` (20 MB of old hero stills/video), old `city.glb`/`city-2k.jpg`, GeistSerif, `story/city.js`, `story/daylight.js`.
 
 ## Documentation
 

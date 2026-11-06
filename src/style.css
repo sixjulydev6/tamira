@@ -1,3 +1,6 @@
+/* Instrument Sans (SIL OFL), latin subset, self-hosted: no third-party round trips before first text */
+@font-face { font-family: "Instrument Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/InstrumentSans-400.woff2") format("woff2"); }
+@font-face { font-family: "Instrument Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/InstrumentSans-500.woff2") format("woff2"); }
 /* ------------------------------------------------------------------
    Tamira — hero
    Day → night is driven by one variable, --night (0 → 1), set from scroll.
@@ -625,6 +628,19 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
 }
 @media (hover: hover) and (pointer: fine) {
   .end__cta:hover { opacity: 0.86; }
+}
+
+/* Live story: the contact section rises over the outro's last screen (the hero tower at sunset) instead
+   of following it on a black page. It fills one screen so the scroll ends exactly at story progress 1,
+   and keeps its copy low with a scrim from the page colour for legibility. */
+.story.is-live-3d ~ .end {
+  margin-top: -100svh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  background: linear-gradient(to top, var(--bg) 0%, color-mix(in srgb, var(--bg) 82%, transparent) 30%, transparent 62%);
 }
 
 /* ------------------------------------------------------------------ static story (reduced motion / no WebGL) */

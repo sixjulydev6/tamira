@@ -12,12 +12,12 @@ const PAL = {
   mid: ['#7fb3ec', '#8c8fbc', '#22417f', '#173170'],
   horizon: ['#cfe3f6', '#eaa57c', '#3d5b97', '#2c4682'],
   sun: ['#fff0da', '#ff9a58', '#ff6a3a', '#ff6a3a'],
-  sunI: [4.2, 2.2, 0.15, 0],
+  sunI: [4.6, 2.2, 0.15, 0],
   hemiSky: ['#b8d3ff', '#7a86b8', '#33508f', '#2c4580'],
   hemiGround: ['#6f6656', '#4f3f33', '#141826', '#0b0e18'],
-  hemiI: [0.78, 0.55, 0.34, 0.28],
+  hemiI: [1.54, 0.55, 0.34, 0.28],
   fog: ['#d3e3f1', '#a38d97', '#1f2f57', '#15254d'],
-  fogD: [0.00022, 0.00042, 0.0006, 0.00062],
+  fogD: [0.00022, 0.00042, 0.0006, 0.00062], // day back to light haze (2026-11-06 ?gui settings): the far blocks now have real facades
   glow: ['#000000', '#000000', '#2f2b4a', '#3a2f4c']
 }
 const cols = {}
@@ -83,4 +83,10 @@ void main(){
 `
 
 
-export { SKY_VERT, SKY_FRAG, sample, DUSK };
+// Live palette edits (?gui): keep the cached Color objects in step with PAL.
+function setPal(key, i, v) {
+  PAL[key][i] = v
+  if (cols[key]) cols[key][i].set(v)
+}
+
+export { SKY_VERT, SKY_FRAG, sample, DUSK, PAL, KEYS, setPal };

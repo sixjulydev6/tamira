@@ -13,7 +13,7 @@ const R_CORE = 0.8;
 const R_STRAND = 0.115;
 const SAMPLES = 420;           // arc-length samples of the path
 const JACKET_SEG = 260, JACKET_RAD = 36;
-const STRAND_SEG = 150, STRAND_RAD = 7;
+const STRAND_SEG = 150, STRAND_RAD = 10;   // round strands, not faceted bands
 const TEXT_REPEAT = 13;        // world units per repeat of the printed legend
 
 // 30 strands in concentric layers: 1 + 6 + 11 + 12
@@ -23,6 +23,12 @@ const STRAND_LAYOUT = (() => {
     for (let i = 0; i < n; i++) { const a = phase + (i / n) * Math.PI * 2; out.push([Math.cos(a) * r, Math.sin(a) * r]); }
   return out;
 })();
+// Drawn copper is never perfectly uniform: each strand gets its own gauge (±6%) and tone (bright to
+// slightly oxidised), so the bundle reads as many round wires instead of one striped surface.
+const STRAND_LOOK = STRAND_LAYOUT.map((_, s) => {
+  const h = (k) => { const x = Math.sin((s + 1) * 91.7 + k * 17.3) * 43758.5453; return x - Math.floor(x); };
+  return { r: R_STRAND * (0.94 + h(1) * 0.12), tone: 0.84 + h(2) * 0.26, warm: h(3) * 0.08 };
+});
 
 export class Wire {
   constructor({ color = "#c21d19", capColor = "#d2453c", ink = "rgba(255, 232, 224, 0.62)", envMapIntensity = 0.7 } = {}) {
@@ -56,7 +62,7 @@ export class Wire {
     // copper
     this.strandUniforms = { uGlow: { value: 0 } };
     this.strandGeo = strandsGeometry();
-    const copper = new THREE.MeshStandardMaterial({ color: 0xd08a5a, metalness: 1, roughness: 0.3, emissive: 0x000000 });
+    const copper = new THREE.MeshStandardMaterial({ color: 0xd08a5a, metalness: 1, roughness: 0.26, emissive: 0x000000, vertexColors: true });
     copper.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.strandUniforms);
       shader.fragmentShader = shader.fragmentShader
@@ -151,8 +157,10 @@ export class Wire {
       const coreTail = Math.max(tail, jEnd - 30);   // strands only need to exist near where they show
       for (let s = 0; s < STRAND_LAYOUT.length; s++) {
         const [ox0, oy0] = STRAND_LAYOUT[s];
+        const rs = STRAND_LOOK[s].r;
         const r0 = Math.hypot(ox0, oy0), a0 = Math.atan2(oy0, ox0);
         const seed = Math.sin(s * 12.9898) * 43758.5453; const rnd = seed - Math.floor(seed);
+        let cx = 0, cy = 0, cz = 0;
         for (let i = 0; i <= STRAND_SEG; i++) {
           const d = coreTail + (head - coreTail) * (i / STRAND_SEG) - (s === 0 ? 0 : rnd * 0.35 * P.fan);
           this.frameAt(d, fr);
@@ -161,15 +169,26 @@ export class Wire {
           // twist measured from the tip, so wires on different paths look identical at the tip
           const a = a0 + (d - head) * P.twist * 0.18 + P.fan * past * (rnd - 0.5) * 0.8;
           const ox = Math.cos(a) * r0 * R_CORE * spread, oy = Math.sin(a) * r0 * R_CORE * spread;
-          const cx = fr.p.x + fr.n.x * ox + fr.b.x * oy, cy = fr.p.y + fr.n.y * ox + fr.b.y * oy, cz = fr.p.z + fr.n.z * ox + fr.b.z * oy;
+          cx = fr.p.x + fr.n.x * ox + fr.b.x * oy; cy = fr.p.y + fr.n.y * ox + fr.b.y * oy; cz = fr.p.z + fr.n.z * ox + fr.b.z * oy;
           for (let j = 0; j <= STRAND_RAD; j++) {
             const q = (j / STRAND_RAD) * Math.PI * 2, c = Math.cos(q), sn = Math.sin(q);
             const nx = fr.n.x * c + fr.b.x * sn, ny = fr.n.y * c + fr.b.y * sn, nz = fr.n.z * c + fr.b.z * sn;
-            pos[v * 3] = cx + nx * R_STRAND; pos[v * 3 + 1] = cy + ny * R_STRAND; pos[v * 3 + 2] = cz + nz * R_STRAND;
+            pos[v * 3] = cx + nx * rs; pos[v * 3 + 1] = cy + ny * rs; pos[v * 3 + 2] = cz + nz * rs;
             nor[v * 3] = nx; nor[v * 3 + 1] = ny; nor[v * 3 + 2] = nz;
             v++;
           }
         }
+        // the cut end: a solid, slightly domed copper face (fr is still the tip frame)
+        for (let j = 0; j <= STRAND_RAD; j++) {
+          const q = (j / STRAND_RAD) * Math.PI * 2, c = Math.cos(q), sn = Math.sin(q);
+          const nx = fr.n.x * c + fr.b.x * sn, ny = fr.n.y * c + fr.b.y * sn, nz = fr.n.z * c + fr.b.z * sn;
+          pos[v * 3] = cx + nx * rs; pos[v * 3 + 1] = cy + ny * rs; pos[v * 3 + 2] = cz + nz * rs;
+          nor[v * 3] = fr.t.x * 0.8 + nx * 0.6; nor[v * 3 + 1] = fr.t.y * 0.8 + ny * 0.6; nor[v * 3 + 2] = fr.t.z * 0.8 + nz * 0.6;
+          v++;
+        }
+        pos[v * 3] = cx + fr.t.x * rs * 0.3; pos[v * 3 + 1] = cy + fr.t.y * rs * 0.3; pos[v * 3 + 2] = cz + fr.t.z * rs * 0.3;
+        nor[v * 3] = fr.t.x; nor[v * 3 + 1] = fr.t.y; nor[v * 3 + 2] = fr.t.z;
+        v++;
       }
       this.strandGeo.attributes.position.needsUpdate = true;
       this.strandGeo.attributes.normal.needsUpdate = true;
@@ -211,18 +230,30 @@ function tubeGeometry(seg, rad) {
 }
 
 function strandsGeometry() {
-  const per = (STRAND_SEG + 1) * (STRAND_RAD + 1), n = STRAND_LAYOUT.length;
+  const ring = STRAND_RAD + 1, tube = (STRAND_SEG + 1) * ring, per = tube + ring + 1, n = STRAND_LAYOUT.length;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(per * n * 3), 3).setUsage(THREE.DynamicDrawUsage));
   geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(per * n * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  // per-strand copper tone (static); cut faces read a touch brighter, like freshly cut metal
+  const col = new Float32Array(per * n * 3);
+  for (let s = 0; s < n; s++) {
+    const { tone, warm } = STRAND_LOOK[s];
+    for (let k = 0; k < per; k++) {
+      const cut = k >= tube ? 1.12 : 1, o = (s * per + k) * 3;
+      col[o] = tone * cut * (1 + warm * 0.4); col[o + 1] = tone * cut * (1 - warm * 0.5); col[o + 2] = tone * cut * (1 - warm);
+    }
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
   const idx = [];
   for (let s = 0; s < n; s++) {
     const base = s * per;
     for (let i = 0; i < STRAND_SEG; i++)
       for (let j = 0; j < STRAND_RAD; j++) {
-        const a = base + i * (STRAND_RAD + 1) + j, b = a + STRAND_RAD + 1;
+        const a = base + i * ring + j, b = a + ring;
         idx.push(a, a + 1, b, b, a + 1, b + 1);
       }
+    const r = base + tube, c = r + ring;
+    for (let j = 0; j < STRAND_RAD; j++) idx.push(c, r + j, r + j + 1);
   }
   geo.setIndex(idx);
   return geo;

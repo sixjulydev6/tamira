@@ -69,14 +69,125 @@ const NIGHT = /* glsl */ `
 }
 `
 
-// filler blocks: storey bands of dark glazing between light spandrels, from world height
+// Filler blocks: real facades instead of white boxes. Each block (keyed by its instance colour) gets one of
+// three facade types (ribbon windows, punched windows, glass curtain wall), its own window module, glass
+// that varies window to window (sky reflection, blinds), and a glazed shopfront at street level.
 const FILLER_COLOR = /* glsl */ `
 #ifdef T_FILLER
 {
+  vec3 f_n = normalize(vWN);
+  float f_vert = 1. - smoothstep(.3, .6, abs(f_n.y));
+  float f_id = tHash12(diffuseColor.rg * 97.31 + diffuseColor.b * 13.7);
+  vec2 f_t2 = normalize(vec2(-f_n.z, f_n.x) + vec2(1e-4));
+  float f_u = dot(vW.xz, f_t2);
   float f_fb = fract(vW.y / 3.6);
-  float f_vert = 1. - smoothstep(.3, .6, abs(normalize(vWN).y));
-  float f_g = step(.3, f_fb) * step(f_fb, .9) * f_vert;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.05, .07, .1), f_g * .75);
+  float f_mw = mix(1.5, 3.1, fract(f_id * 7.13));
+  float f_fx = fract(f_u / f_mw);
+  float f_ribbon = step(.3, f_fb) * step(f_fb, .88);
+  float f_punch = f_ribbon * step(.2, f_fx) * step(f_fx, .8);
+  float f_wall = step(.1, f_fb) * step(f_fb, .96) * step(.05, f_fx) * step(f_fx, .95);
+  float f_g = f_id < .4 ? f_ribbon : f_id < .8 ? f_punch : f_wall;
+  float f_shop = 1. - step(3.9, vW.y);
+  f_g = mix(f_g, step(.08, fract(f_u / 4.2)) * step(.4, vW.y) * step(vW.y, 3.3), f_shop) * f_vert;
+  float f_w = tHash12(floor(vec2(f_u / f_mw, vW.y / 3.6)) + f_id * 31.7);
+  vec3 f_glass = mix(vec3(.035, .05, .075), vec3(.17, .21, .27), f_w * f_w);
+  f_glass = mix(f_glass, vec3(.34, .33, .3), step(.9, f_w) * step(f_fb, .62));   // blinds drawn
+  diffuseColor.rgb = mix(diffuseColor.rgb, f_glass, f_g * .88);
+  tGlassK = f_g;
+}
+#endif
+`
+
+// Curtain-wall glass (vertical faces): no two panes sit perfectly flat, so each 1.2 m x 3.6 m pane gets
+// its own small tilt plus a faint roller-wave ripple, and the sky reflection breaks up pane by pane.
+// The pane grid matches the focal tower's mullions (1.2 m module, phase 0.775; storeys of 3.6 m).
+const GLASS_PANES = /* glsl */ `
+{
+  vec3 g_n = normalize(vWN);
+  float g_vert = 1. - smoothstep(.3, .6, abs(g_n.y));
+  vec3 g_t = normalize(vec3(-g_n.z, 0., g_n.x) + vec3(1e-5));
+  vec2 g_cell = vec2(floor((dot(vW, g_t) - .775) / 1.2), floor(vW.y / 3.6));
+  vec2 g_key = g_cell + floor(g_n.xz * 2. + .5) * 57.3;
+  float g_h1 = tHash12(g_key), g_h2 = tHash12(g_key + 3.7);
+  float g_fy = fract(vW.y / 3.6);
+  vec3 g_off = g_t * (g_h1 - .5) * .06 + vec3(0., 1., 0.) * ((g_h2 - .5) * .045 + sin(g_fy * 18.85) * .008);
+  normal = normalize(normal + (viewMatrix * vec4(g_off * g_vert * tGlassK, 0.)).xyz);
+}
+`
+// The focal tower's glass has no facade image: vary tint and gloss per pane, and draw blinds part-way
+// down in about one pane in twenty (behind tinted glass they read only a little lighter), as an occupied
+// office tower looks.
+const HERO_GLASS_COLOR = /* glsl */ `
+{
+  vec3 h_n = normalize(vWN);
+  vec3 h_t = normalize(vec3(-h_n.z, 0., h_n.x) + vec3(1e-5));
+  vec2 h_key = vec2(floor((dot(vW, h_t) - .775) / 1.2), floor(vW.y / 3.6)) + floor(h_n.xz * 2. + .5) * 57.3;
+  float h_a = tHash12(h_key + 11.1), h_b = tHash12(h_key + 19.4);
+  diffuseColor.rgb *= .9 + .2 * h_a;
+  float h_fy = fract(vW.y / 3.6);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.085, .085, .082), step(.94, h_b) * step(1. - .2 - .45 * h_a, h_fy) * (1. - smoothstep(.3, .6, abs(h_n.y))));
+  tGlassRough = .8 + .5 * h_b;
+}
+`
+// Facade-image surfaces are part glass, part panel: only the dark (glass) pixels of the elevation image get
+// pane tilt and sky reflection; the light panels and spandrels stay matte.
+const FACADE_GLASS_MASK = /* glsl */ `
+#ifdef USE_MAP
+  tGlassK *= 1. - smoothstep(.04, .16, tFacLum);
+#endif
+`
+// Daylight sky reflection in glass. The day HDRI's lower half is a rooftop terrace, so on vertical glass the
+// environment gives one flat slate tone. Real towers mirror the actual sky: brighter higher up the face,
+// the city's darker band below the horizon, all broken up by each pane's tilt (GLASS_PANES). Coated
+// glazing reflects ~16% head-on, rising to a mirror at grazing angles (Schlick).
+const GLASS_SKY = /* glsl */ `
+{
+  vec3 r_nW = normalize((vec4(normal, 0.) * viewMatrix).xyz);
+  vec3 r_v = normalize(cameraPosition - vW);
+  vec3 r_d = reflect(-r_v, r_nW);
+  float r_f = mix(.16, 1., pow(1. - clamp(dot(r_nW, r_v), 0., 1.), 5.));
+  vec3 r_c = mix(tSky(r_d), vec3(.045, .05, .056), smoothstep(.0, -.3, r_d.y));
+  float r_vert = 1. - smoothstep(.3, .6, abs(r_nW.y));
+  totalEmissiveRadiance += r_c * r_f * tGlassK * r_vert * (1. - uNight) * (1. - uXray) * GLASS_SKY_K;
+}
+`
+// Lawns: large patches of lusher and drier grass, mowing stripes, fine grain, and the slightly muted green
+// real turf has from the air (fully saturated green is what makes a park read as a game board).
+const LAWN_COLOR = /* glsl */ `
+{
+  float l_n = tNoise3(vec3(vW.xz * .03, 0.)) * .55 + tNoise3(vec3(vW.xz * .14, 3.)) * .3 + tNoise3(vec3(vW.xz * .8, 7.)) * .15;
+  vec3 l_lush = vec3(.07, .13, .045), l_dry = vec3(.16, .155, .08);
+  vec3 l_c = mix(l_lush, l_dry, smoothstep(.38, .72, l_n)) * (.88 + .24 * l_n);
+  float l_px = length(fwidth(vW.xz));
+  l_c *= .955 + .09 * smoothstep(.35, .65, fract(dot(vW.xz, vec2(.7071)) / 9.)) * (1. - smoothstep(2., 5., l_px));   // mowing stripes
+  l_c *= .9 + .2 * tNoise3(vec3(vW.xz * 2.2, 5.)) * (1. - smoothstep(.15, .45, l_px));                              // grain, faded before it can shimmer
+  diffuseColor.rgb = mix(vec3(dot(l_c, vec3(.3, .59, .11))), l_c, .84);
+}
+`
+// Weathering. Real buildings are never factory-clean: rain streaks run down from sills and parapets, dirt
+// and splash collect at street level, faces differ slightly in tone, and roofs are patchy membrane and
+// gravel. Glass panes and foliage stay clean. High-frequency terms fade out with the pixel footprint so
+// distant facades never shimmer.
+const WEATHER = /* glsl */ `
+#ifndef T_FILLER
+{
+  vec3 w_n = normalize(vWN);
+  float w_vert = 1. - smoothstep(.3, .6, abs(w_n.y));
+  float w_clean = max(T_LEAF, tGlassK);
+  vec3 w_t = normalize(vec3(-w_n.z, 0., w_n.x) + vec3(1e-5));
+  float w_u = dot(vW, w_t);
+  float w_px = length(fwidth(vW));
+  float w_hf = 1. - smoothstep(.35, .9, w_px);
+  float w_streak = tNoise3(vec3(w_u * .9, vW.y * .04, 1.7)) * tNoise3(vec3(w_u * .22, vW.y * .011, 4.1));
+  float w_base = 1. - smoothstep(0., 7., vW.y);
+  float w_tone = tNoise3(vW * .012 + 2.3);
+  float w_k = w_vert * (smoothstep(.22, .55, w_streak) * .17 * w_hf + w_base * .14) + (w_tone - .5) * .12;
+  float w_roof = smoothstep(.8, .95, w_n.y) * step(4., vW.y);
+  float w_r = tNoise3(vec3(vW.xz * .15, 9.)) * .6 + tNoise3(vec3(vW.xz * 1.7, 2.)) * .4 * w_hf;
+  w_k += w_roof * (w_r - .5) * .38;
+  w_k *= 1. - w_clean;
+  diffuseColor.rgb *= 1. - w_k;
+  tWeather = w_k;
 }
 #endif
 `
@@ -107,6 +218,15 @@ export function patchCityMaterial(material, { filler = false, cls = 'solid', fac
     T_LEAF: cls === 'leaf' ? '1.' : '0.'
   })
   if (filler) material.defines.T_FILLER = ''
+  material.defines.GLASS_SKY_K = filler ? '.55' : '.85'
+  const heroGlass = material.name === 'glass_hero', lawn = material.name === 'grass_lawn'
+  // Only compile what a material uses: glass code for glass (and filler windows), weathering for opaque
+  // surfaces. Leaves carry most of the overdraw (thousands of alpha-tested cards), so they get neither.
+  const glassy = cls === 'glass' || filler, weathered = cls !== 'leaf' && cls !== 'glass' && !filler
+  // curtain-wall mullions: anodised mid-grey aluminium, not mirror silver (which drew a bright white grid)
+  if (material.name === 'metal_alu') { material.color.setRGB(.5, .51, .52); material.roughness = .5 }
+  // road markings and park paths: weathered off-white, not fresh paper white
+  if (material.name === 'paint_road') material.color.setRGB(.4, .39, .36)
   // facade: { v0, vspan, repeat, rough: [glass, panel] }
   const facadeU = facade && {
     uFacade: { value: new THREE.Vector3(facade.v0, facade.vspan, facade.repeat ? 1 : 0) },
@@ -146,19 +266,28 @@ export function patchCityMaterial(material, { filler = false, cls = 'solid', fac
         float tCe = tCut(vW);
         if (tCe > 0.) discard;
         float tCg = (uCut > 0. && uCut < 1.) ? exp(-tCe * tCe * 30.) : 0.;`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\n${FILLER_COLOR}`)
+      .replace('#include <color_fragment>', `float tGlassK = T_GLASS; float tGlassRough = 1.; float tWeather = 0.;\n#include <color_fragment>\n${FILLER_COLOR}${facade ? FACADE_GLASS_MASK : ''}${heroGlass ? HERO_GLASS_COLOR : ''}${lawn ? LAWN_COLOR : weathered ? WEATHER : ''}`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${glassy ? GLASS_PANES : ''}`)
     if (facadeU) sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform vec3 uFacade;\nuniform vec2 uFacRough;')
       .replace('#include <map_fragment>', `float tFacLum = 0.;\n${FACADE_MAP}`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = mix(uFacRough.x, uFacRough.y, clamp((tFacLum - .02) / .18, 0., 1.));`)
+    // glass gloss: hero panes vary (tGlassRough); filler windows are glass, not plaster
+    sh.fragmentShader = sh.fragmentShader.replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+        roughnessFactor *= tGlassRough;
+        roughnessFactor = clamp(roughnessFactor + tWeather * .35, 0., 1.);   // grime is matte
+        #ifdef T_FILLER
+          roughnessFactor = mix(roughnessFactor, .14, tGlassK);
+        #endif`)
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        ${NIGHT}
+        ${cls === 'leaf' ? '' : NIGHT}
+        ${glassy ? GLASS_SKY : ''}
         totalEmissiveRadiance += vec3(.7, .86, 1.) * tScan * 1.3 + vec3(1., .5, .2) * tCg * 2.4;`)
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb *= 1. - uDim;\n#include <fog_fragment>\ngl_FragColor.rgb = tHorizon(gl_FragColor.rgb, vW);')
   }
-  material.customProgramCacheKey = () => `temira-city-${cls}${filler ? '-filler' : ''}${facade ? '-facade' : ''}`
+  material.customProgramCacheKey = () => `temira-city-${cls}${filler ? '-filler' : ''}${facade ? '-facade' : ''}${heroGlass ? '-heroglass' : ''}${lawn ? '-lawn' : ''}`
   return material
 }
 

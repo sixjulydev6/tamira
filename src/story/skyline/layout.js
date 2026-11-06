@@ -14,12 +14,6 @@ export const IN = { x0: 66.6, x1: 90.4, z0: 14.6, z1: 47.4 }
 export const FLOOR = { y0: 50.4, h: 3.6, n: 34 }
 export const XM = 78.6 // partition along x
 export const ZM = 31.0 // partition along z
-export const ROOMS = [
-  { x0: IN.x0, x1: XM, z0: IN.z0, z1: ZM },
-  { x0: XM, x1: IN.x1, z0: IN.z0, z1: ZM },
-  { x0: IN.x0, x1: XM, z0: ZM, z1: IN.z1 },
-  { x0: XM, x1: IN.x1, z0: ZM, z1: IN.z1 }
-]
 // riser runs up the corner where the two partitions meet, in full view of the cutaway
 export const RISER = [79.0, 31.4]
 export const UG = -6 // underground duct depth

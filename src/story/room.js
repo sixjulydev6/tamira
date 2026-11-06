@@ -21,9 +21,9 @@ export function createRoom(element) {
     if(painter&&u>6.85)painter.paint(u);
     // Do not cover the matched live board with a blank canvas while images are decoding.
     const opacity=painter?.painted?smooth(6.99,7.06,u):0;
-    element.style.opacity=String(opacity);
-    element.style.visibility=opacity>0?'visible':'hidden';
-    element.style.setProperty('--room-end',smooth(7.74,7.94,u));
+    element.style.opacity=String(opacity*(1-smooth(0,.07,local(p,'outro'))));
+    element.style.visibility=opacity>0&&local(p,'outro')<.07?'visible':'hidden';
+    element.style.setProperty('--room-end','0'); // no fade to black: the outro crossfades from the lit room to the city (user direction)
     element.dataset.frame=f;
   }
   return { update, diagnostics:()=>({frame,loading,u:lastU,painted:!!painter?.painted,stats:painter?.stats,decoded:painter?[...painter.bmps.keys()]:[]}), dispose(){alive=false;painter?.dispose();element.style.opacity='0';element.style.visibility='hidden';} };

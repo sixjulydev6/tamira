@@ -26,6 +26,11 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   };
   // two canvases: the city (with bloom) and the product wire; main.js crossfades them at the hand-over
   const renderer = makeRenderer(canvas);
+  // The city canvas (establishing shots, network, bundle) is fill-rate bound: thousands of overlapping
+  // alpha-tested leaf cards plus AO, depth blur and bloom. At 1.75x on Retina it alternated 60/30 fps while
+  // scrolling; 1.5x holds 60 and is still well above 1x (most of the frame sits in haze and depth blur).
+  // The product wire canvas keeps 1.75x; type is HTML and unaffected.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   const wireRenderer = makeRenderer(wireCanvas);
   wireRenderer.toneMapping = THREE.NeutralToneMapping;
 
@@ -185,14 +190,17 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     const wireIn = local(p, "wireIn");
     const showWire = wireIn > 0;
     const out = { anchors: null };
-    if (wireIn < 0.5) {
+    const outro = local(p, "outro");
+    if (wireIn < 0.5 || outro > 0) {
       skyline.update(p, bg, { points: shapeWorld.entry, d0 });
       skyline.render();
       if(local(p,'bundle')>0&&local(p,'drain')===0)out.anchors=skyline.bundleAnchors();
     }
     const finale = local(p, "finale");
     if (!finaleStage && (local(p, "smoke") > .25 || finale > 0)) finaleStage = createFinaleStage(wireRenderer, wireScene, wire);
-    if (showWire && finale > 0) {
+    if (outro > 0) {
+      finaleStage?.hide();                       // the room covers the board until the city is back
+    } else if (showWire && finale > 0) {
       // Reconstruct the smoke endpoint on every seek/resize, so reverse scrolling is identical.
       finaleStage.hide();
       wireState(progressOf('smoke',1));
@@ -239,15 +247,43 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     skyline.dispose(); environmentTargets.forEach(target => target.dispose());
     renderer.dispose(); wireRenderer.dispose();
   }
+  // Adaptive resolution for the city canvas. Its cost is fill rate (leaf overdraw, AO, depth blur, bloom),
+  // which varies widely between GPUs. If frames keep missing the 60 fps budget (a third of the last
+  // 45 over 21 ms, i.e. under a second of stutter) the canvas steps down one resolution level: 1.5x -> 1.25x -> 1x. It never steps back up,
+  // so it cannot oscillate; one-off spikes (a shader compile, a texture upload) never reach the threshold.
+  const PR_STEPS = [1.5, 1.25, 1];
+  let prStep = 0, frames = 0, slowFrames = 0, pendingStep = false, stillFrames = 0, watchedProgress = -1;
+  function watchFrame(dt) {
+    if (!skyline.loaded || dt > 0.25) return;           // not running yet, or a stalled/background frame
+    // Reallocating the render targets takes a moment, so a decided step waits for the reader to pause:
+    // a short hitch on a still frame is invisible, the same hitch mid-scroll reads as a jump.
+    stillFrames = lastProgress === watchedProgress ? stillFrames + 1 : 0; watchedProgress = lastProgress;
+    if (pendingStep) {
+      if (stillFrames < 8) return;
+      pendingStep = false; prStep++;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PR_STEPS[prStep]));
+      resize();
+      update(lastProgress, { bg: lastBgColor });   // resizing clears the canvas: redraw now, or that frame shows blank
+      frames = 0; slowFrames = 0;
+      return;
+    }
+    frames++; if (dt > 0.021) slowFrames++;
+    if (frames < 45) return;
+    const next = PR_STEPS[prStep + 1];
+    if (slowFrames >= 15 && next && next < renderer.getPixelRatio()) pendingStep = true;
+    frames = 0; slowFrames = 0;
+  }
+
   return {
     update, resize, dispose,
     get ready() { return skyline.loaded; },
     get progress() { return skyline.progress; },
     get error() { return skyline.error; },
     tick(delta) {
-      if (disposed || local(lastProgress, "wireIn") >= .5 || document.hidden) return;
+      if (disposed || (local(lastProgress, "wireIn") >= .5 && local(lastProgress, "outro") === 0) || document.hidden) return;
       skyline.tick(delta);
+      watchFrame(delta);
     },
-    diagnostics: () => ({ skyline: skyline.diagnostics(), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, progress: lastProgress, finale: finaleStage?.diagnostics() }),
+    diagnostics: () => ({ pixelRatio: renderer.getPixelRatio(), skyline: skyline.diagnostics(), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, progress: lastProgress, finale: finaleStage?.diagnostics() }),
   };
 }

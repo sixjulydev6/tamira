@@ -7,12 +7,20 @@
   <meta name="description" content="Tamira makes wiring and cable for homes, industry and infrastructure.">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="preload" as="image" type="image/webp"
-        imagesrcset="/media/hero-rise-1920.webp 1920w, /media/hero-rise-3840.webp 3840w"
-        imagesizes="max(100vw, 178svh)">
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/InstrumentSans-400.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/InstrumentSans-500.woff2" crossorigin>
+  <!-- The opening's heavy files start downloading with the page instead of after the 3D chunk has run:
+       the city GLB and sky HDRI (fetched by GLTFLoader/RGBELoader with same-origin credentials, so
+       crossorigin matches and the preload is reused) and the first-view surface textures (plain <img> loads). -->
+  <link rel="preload" as="fetch" crossorigin fetchpriority="low" href="/skyline/city-v2.glb">
+  <link rel="preload" as="fetch" crossorigin fetchpriority="low" href="/skyline/day-env-512.hdr">
+  <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/facade-office/facade_COL.webp">
+  <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/brick-reclaimed/brick_COL.webp">
+  <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/brick-reclaimed/brick_NRM.webp">
+  <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/brick-reclaimed/brick_ROUGH.webp">
+  <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/tree-ash/leaf_COL.webp">
+  <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/tree-ash/bark_COL.webp">
+  <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/tree-ash/bark_NRM.webp">
   <link rel="stylesheet" href="/src/style.css">
   <script>document.documentElement.classList.add("is-loading")</script>
 </head>
@@ -79,8 +87,8 @@
           <!-- Transparent street-level poster: first paint, reduced motion and WebGL fallback. -->
           <div class="hero__rise">
             <picture>
-              <source media="(max-aspect-ratio: 4/5)" srcset="/skyline/poster-portrait.jpg">
-              <img class="hero__opening" src="/skyline/poster-desktop.jpg"
+              <source media="(max-aspect-ratio: 4/5)" srcset="/skyline/poster-portrait.webp">
+              <img class="hero__opening" src="/skyline/poster-desktop.webp"
                    alt="" width="1440" height="900" decoding="async" fetchpriority="high">
             </picture>
           </div>
