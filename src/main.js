@@ -406,6 +406,8 @@ function runStory() {
   if (import.meta.env.DEV) {
     window.__tamira = {
       diagnostics: () => ({ ...story?.diagnostics(), room: room.diagnostics() }),
+      lenis, progress: () => state.p,
+      segmentAt: (p) => SEGMENTS.find((sg) => local(p, sg.id) < 1)?.id ?? "end",
       seek: (segment, t = 0.5) => {
         const p = progressOf(segment, t);
         if (!Number.isFinite(p)) return;

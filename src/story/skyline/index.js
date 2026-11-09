@@ -235,11 +235,16 @@ export function createSkyline(renderer) {
       const settled=Promise.all([envFile.then(applyDayEnvironment,()=>{}),...texReady]);
       return Promise.race([settled,new Promise(r=>setTimeout(r,12000))]).then(()=>{
         if(disposed)return;
-        loaded=true;update(lastP,lastBg,entry);renderer.compile(scene,camera);
+        update(lastP,lastBg,entry);
+        // warm everything before opening (bounded: a slow GPU opens after 6 s and finishes compiling in the background)
+        return Promise.race([warmUp(),new Promise(r=>setTimeout(r,6000))]);
+      }).then(()=>{
+        if(disposed)return;
+        loaded=true;update(lastP,lastBg,entry);
         if(new URLSearchParams(location.search).has('gui'))import('./gui.js').then(({createSkylineGui})=>{
           if(!disposed)gui=createSkylineGui({tune:TUNE,tones:Object.keys(TONE),cityMaterials,markShadows:()=>{renderer.shadowMap.needsUpdate=true;}});});
         // the modelled room only after the opening is on screen; the climb reaches it much later
-        room.load(url).then(()=>{if(disposed)return;renderer.compile(scene,camera);('requestIdleCallback' in window?requestIdleCallback:setTimeout)(warmUp,{timeout:3000});});
+        room.load(url).then(()=>{if(disposed)return;warmUp(room.group);});   // just the room: small, parallel compiles
       });
     }).catch(e=>{error=e;console.error('Skyline opening failed',e);});
 
@@ -285,9 +290,11 @@ export function createSkyline(renderer) {
   const SHADOW_BOX=new THREE.Box3(new THREE.Vector3(-260,0,-310),new THREE.Vector3(260,220,770));
   const fitCam=new THREE.OrthographicCamera(),corner=new THREE.Vector3(),lastSunDir=new THREE.Vector3();
   // Phones: re-rendering the whole city's shadow map every frame while the sun sets was the main scroll
-  // hitch. Re-render only once the sun has moved a visible step (about 0.35 deg desktop, 1 deg phones),
+  // hitch. Re-render only once the sun has moved a visible step (1 deg),
   // and stop updating the shadow map once the sun is down (intensity ~0 at night and in the x-ray).
-  const SHADOW_STEP=1-Math.cos((matchMedia('(pointer:coarse)').matches?1:.35)*Math.PI/180);
+  // 2026-11-09: desktop too (was 0.35 deg): each re-render draws the whole city into the 2048 map, and at 0.35 deg
+  // the dusk scroll dropped frames at 1.5x; with no shadow updates it held 60 fps
+  const SHADOW_STEP=1-Math.cos(1*Math.PI/180);
   function fitShadow(){
     // castShadow stays constant (toggling it recompiles every city shader); after sunset the map just stops updating
     if(sun.castShadow!==TUNE.shadows){sun.castShadow=TUNE.shadows;lastSunDir.set(0,0,0);}
@@ -440,22 +447,53 @@ export function createSkyline(renderer) {
   // ahead, on the first pass only): shaders for the city, the cable close-up and the crossfade/fade
   // overlays, every texture uploaded to the GPU (room, cable prints, facades), and the crossfade target
   // allocated at the canvas size.
-  let warmed=false;
-  function warmUp(){
-    if(disposed||warmed)return;warmed=true;
+  // Pre-compile and pre-upload everything the story will draw, so no frame mid-scroll stalls on a shader compile or
+  // a first geometry/texture upload (traced 2026-11-09: 170-400 ms freezes in the climb and room approach were
+  // getProgramInfoLog/bufferData on first use). three's compile() only walks VISIBLE objects, and the tower room,
+  // ceiling cable and cable assembly are hidden while the hero is up, so every object is shown for the duration.
+  // compileAsync starts the compiles in parallel (KHR_parallel_shader_compile) without blocking; once they are
+  // ready, one draw of each scene into a 2x2 target uploads the geometry, and the textures are uploaded.
+  // only: limit to one subtree of the city scene (the room, once its GLB arrives); everything else in the city is
+  // hidden for the duration except the lights, so the programs are keyed on the same light set as the real frames
+  let warmed=false;   // the bridge target exists (resize keeps it sized from then on)
+  function forceAllVisible(only=null){
+    const saved=[],show=o=>{saved.push([o,o.visible,o.frustumCulled]);o.visible=true;o.frustumCulled=false;};
+    if(only){for(const c of scene.children){saved.push([c,c.visible,c.frustumCulled]);c.visible=c.isLight||c===only;}only.traverse(show);}
+    else for(const root of [scene,bridgeScene,fadeScene,compositeScene])root.traverse(show);
+    return ()=>{for(let i=saved.length-1;i>=0;i--){const [o,v,f]=saved[i];o.visible=v;o.frustumCulled=f;}};
+  }
+  // Returns when the compiles and uploads are done. The whole story is warmed while the loader is still up (nobody
+  // can scroll yet: a big compile stalls every frame drawn meanwhile, measured at up to 2.9 s mid-dusk when it ran
+  // after the reveal); the room GLB, which arrives after the reveal, is warmed on its own (a small job).
+  function warmUp(only=null){
+    if(disposed)return Promise.resolve();
     const upload=root=>root.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])for(const v of Object.values(m))if(v?.isTexture)renderer.initTexture(v);});
     // three keys a shader on where it draws (screen or offscreen target) and on the tone mapping at that
     // moment, so each scene is compiled exactly as render() later draws it
-    sizeBridgeTarget();renderer.initRenderTarget(bridgeTarget);
-    const prevTarget=renderer.getRenderTarget(),prevTone=renderer.toneMapping;
-    renderer.setRenderTarget(composer.readBuffer);renderer.compile(scene,camera);                 // city, through the composer
-    renderer.setRenderTarget(bridgeTarget);renderer.compile(bridgeScene,bridgeCamera);          // ceiling-cable crossfade layer
-    renderer.setRenderTarget(null);renderer.toneMapping=TONE[TUNE.toneMapping]??THREE.ACESFilmicToneMapping;
-    renderer.compile(fadeScene,fadeCamera);                                                     // background fade over the city
-    renderer.toneMapping=THREE.NeutralToneMapping;
-    renderer.compile(bridgeScene,bridgeCamera);renderer.compile(compositeScene,fadeCamera);    // cable close-up, crossfade composite
+    sizeBridgeTarget();renderer.initRenderTarget(bridgeTarget);warmed=true;
+    const prevTarget=renderer.getRenderTarget(),prevTone=renderer.toneMapping,jobs=[];
+    let restore=forceAllVisible(only);
+    renderer.setRenderTarget(composer.readBuffer);jobs.push(renderer.compileAsync(scene,camera));          // city, through the composer
+    if(!only){
+      renderer.setRenderTarget(bridgeTarget);jobs.push(renderer.compileAsync(bridgeScene,bridgeCamera));   // ceiling-cable crossfade layer
+      renderer.setRenderTarget(null);renderer.toneMapping=TONE[TUNE.toneMapping]??THREE.ACESFilmicToneMapping;
+      jobs.push(renderer.compileAsync(fadeScene,fadeCamera));                                              // background fade over the city
+      renderer.toneMapping=THREE.NeutralToneMapping;
+      jobs.push(renderer.compileAsync(bridgeScene,bridgeCamera),renderer.compileAsync(compositeScene,fadeCamera)); // cable close-up, crossfade composite
+    }
     renderer.setRenderTarget(prevTarget);renderer.toneMapping=prevTone;
-    for(const sc of [scene,bridgeScene,fadeScene,compositeScene])upload(sc);
+    restore();
+    return Promise.all(jobs).catch(()=>{}).then(()=>{
+      if(disposed)return;
+      // geometry upload: one draw into a throwaway target (same type as the composer's, so the programs it uses
+      // are the ones compiled above); the shadow map is left as it was
+      const tiny=new THREE.WebGLRenderTarget(2,2,{type:THREE.HalfFloatType}),prev=renderer.getRenderTarget(),shadowNeeds=renderer.shadowMap.needsUpdate,shadowAuto=renderer.shadowMap.autoUpdate;
+      renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=false;
+      restore=forceAllVisible(only);
+      try{renderer.setRenderTarget(tiny);renderer.render(scene,camera);if(!only)renderer.render(bridgeScene,bridgeCamera);}
+      finally{restore();renderer.setRenderTarget(prev);renderer.shadowMap.autoUpdate=shadowAuto;renderer.shadowMap.needsUpdate=shadowNeeds;tiny.dispose();}
+      for(const sc of only?[only]:[scene,bridgeScene,fadeScene,compositeScene])upload(sc);
+    });
   }
   function sizeBridgeTarget(){renderer.getDrawingBufferSize(bufferSize);if(bridgeTarget.width!==bufferSize.x||bridgeTarget.height!==bufferSize.y)bridgeTarget.setSize(bufferSize.x,bufferSize.y);}
   const compositeScene=new THREE.Scene();compositeScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),compositeMaterial));

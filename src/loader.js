@@ -25,7 +25,7 @@ const LIFT_MS = 1300;
 // city-v2.glb, day-env-512.hdr and the first-view textures. Measured 2026-11-09 at 1.36 MB (with DM Sans); update
 // it when the opening's assets change (performance.getEntriesByType("resource") after the reveal).
 const OPENING_BYTES = 1.36e6;
-const AFTER_BYTES_S = 0.6;     // parse, upload and the first render once the bytes are in
+const AFTER_BYTES_S = 1.7;     // parse, upload, the shader pre-compile (~1.1 s desktop) and the first render once the bytes are in
 const LATER = /\/room|\/favicon/;   // loaded for later chapters, not the opening
 const ETA_FIRST_MS = 700;      // no estimate before this much data
 const ETA_EVERY_MS = 250;
