@@ -68,7 +68,7 @@ Plain HTML/CSS/JavaScript, Vite 5.4.10, GSAP/ScrollTrigger 3.12.5, Lenis 1.3.27,
 | `src/story/finale-timing.js`, `room.js`, `room.json` | Shared ending clock, room loading/lifecycle, source framing metadata |
 | `public/room/` | All 48 unchanged source room images |
 | `art/data/city-layout.json` | Shared city layout, Z-up metres |
-| `src/style.css` | Georgia headings, Instrument Sans copy, actual Tamira SVG logo, responsive layout |
+| `src/style.css` | DM Sans everywhere (headings and copy, 2026-11-09 user direction), actual Tamira SVG logo, responsive layout |
 
 Story total: 35.05 scrolling screens plus the sticky stage viewport; `finale` 4 screens, `room` 3 and `outro` 3 (back out of the tower room to the hero tower at sunset; the contact section overlaps that last screen). Story movement is deterministic from progress; daylight traffic is ambient ticker motion. GSAP matchMedia owns reduced-motion teardown/rebuild.
 
@@ -84,9 +84,11 @@ Chrome's Slow 4G preset (180 KB/s, 562 ms): loader gone at ~10.4 s (was ~50 s+);
 - `city-v2.glb` is **meshopt-compressed** with 16-bit positions and 8-bit normals (5.3 MB to 1.2 MB raw, 0.22 MB brotli; screenshot diff vs float is below animation noise). `room-v2.glb` keeps float positions, 10-bit normals (0.55 MB). Both loaders call `setMeshoptDecoder`. The scan proxy in `skyline/index.js` takes a float copy of the quantized (interleaved int16) positions before `applyMatrix4`; keep that if the GLB is re-exported.
 - City/room textures and the hero posters are WebP (q90 colour, q95 data maps); the sheer-curtain JPGs stay (WebP did not help).
 - `vite.config.js` makes `npm run dev`/`preview` serve `.glb`/`.hdr` brotli-compressed like the production host, so local Slow 4G tests match the deployed site. Loader finish is shorter (`src/loader.js`).
+- Phones (coarse pointer) load `day-env-256.hdr` instead (2x2 float average of the 512, same mean radiance; 99 KB vs 337 KB brotli; phone hero frame matches the 512 within capture noise). `?hdr=512|256` overrides. Slow 4G phone loader: ~9.9 s to ~9.1 s.
 - The sky HDRI is `day-env-512.hdr` (was 1k, 1.3 MB; now 0.4 MB, frame diff vs 1k is below animation noise). It downloads in parallel with the GLB; the opening waits for GLB + HDRI + first-view textures (12 s cap) so nothing pops in under the reveal. The room GLB and its textures load only after the opening is up.
 - `index.html` preloads the GLB, HDRI and first-view textures with `fetchpriority="low"` and matching `crossorigin` (without `crossorigin`, the textures download twice). Textures are de-duplicated per file in `skyline/index.js`.
-- Instrument Sans is self-hosted (`public/fonts`); Google Fonts is gone. `vercel.json` sets long cache headers.
+- DM Sans (one variable latin woff2, weights 100-1000, optical size 9-40) is self-hosted (`public/fonts`) and used everywhere, including the canvas-drawn cable legends and board L/N/E labels; it replaced Georgia + Instrument Sans (after brief trials of Arimo, Epilogue and Figtree) on 2026-11-09. Google Fonts is not linked. `vercel.json` sets long cache headers.
+- The loader shows time left until the opening (not the full site) under its sentence: bytes still to come (`OPENING_BYTES` in `src/loader.js`, 1.33 MB measured) over download speed. Update `OPENING_BYTES` if the opening's assets change.
 - Removed as unused: `public/media/` (20 MB of old hero stills/video), old `city.glb`/`city-2k.jpg`, GeistSerif, `story/city.js`, `story/daylight.js`.
 
 ## Documentation

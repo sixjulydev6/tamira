@@ -31,7 +31,10 @@ const STRAND_LOOK = STRAND_LAYOUT.map((_, s) => {
 });
 
 export class Wire {
-  constructor({ color = "#c21d19", capColor = "#d2453c", ink = "rgba(255, 232, 224, 0.62)", envMapIntensity = 0.7 } = {}) {
+  constructor({ color = "#c21d19", capColor = "#d2453c", ink = "rgba(255, 232, 224, 0.62)", envMapIntensity = 0.7, detail = 1 } = {}) {
+    // detail < 1: fewer rings/sides (the bundle's blue/green cores: small on screen, rebuilt every frame of the reveal)
+    this.jSeg = Math.round(JACKET_SEG * detail); this.jRad = Math.max(12, Math.round(JACKET_RAD * detail));
+    this.sSeg = Math.round(STRAND_SEG * detail); this.sRad = Math.max(6, Math.round(STRAND_RAD * detail));
     this.group = new THREE.Group();
     this.samples = null;
     this.length = 1;
@@ -44,7 +47,7 @@ export class Wire {
     };
 
     // jacket
-    this.jacketGeo = tubeGeometry(JACKET_SEG, JACKET_RAD);
+    this.jacketGeo = tubeGeometry(this.jSeg, this.jRad);
     const jacketMat = new THREE.MeshPhysicalMaterial({
       color: 0xffffff, map: legendTexture(color, ink), roughness: 0.4, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity,
       side: THREE.DoubleSide,
@@ -61,7 +64,7 @@ export class Wire {
 
     // copper
     this.strandUniforms = { uGlow: { value: 0 } };
-    this.strandGeo = strandsGeometry();
+    this.strandGeo = strandsGeometry(this.sSeg, this.sRad);
     const copper = new THREE.MeshStandardMaterial({ color: 0xd08a5a, metalness: 1, roughness: 0.26, emissive: 0x000000, vertexColors: true });
     copper.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.strandUniforms);
@@ -122,6 +125,7 @@ export class Wire {
     const head = this.headDist, jEnd = this.jacketEnd;
     const tail = head - (P.tailLen ?? this.length + 30);    // long enough to run off-screen behind
     const fr = tmpFrame();
+    const JACKET_SEG = this.jSeg, JACKET_RAD = this.jRad, STRAND_SEG = this.sSeg, STRAND_RAD = this.sRad;
 
     // jacket: tail → jacket end, segments packed toward the tip where the camera gets close
     {
@@ -142,7 +146,6 @@ export class Wire {
       this.jacketGeo.attributes.position.needsUpdate = true;
       this.jacketGeo.attributes.normal.needsUpdate = true;
       this.jacketGeo.attributes.uv.needsUpdate = true;
-      this.jacketGeo.computeBoundingSphere();
     }
 
     // cap at the jacket end
@@ -192,7 +195,6 @@ export class Wire {
       }
       this.strandGeo.attributes.position.needsUpdate = true;
       this.strandGeo.attributes.normal.needsUpdate = true;
-      this.strandGeo.computeBoundingSphere();
     }
 
     const U = this.jacketUniforms;
@@ -226,10 +228,11 @@ function tubeGeometry(seg, rad) {
       idx.push(a, a + 1, b, b, a + 1, b + 1);   // counter-clockwise seen from outside
     }
   geo.setIndex(idx);
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity); // rebuilt every frame and never culled: no per-frame bounds walk
   return geo;
 }
 
-function strandsGeometry() {
+function strandsGeometry(STRAND_SEG, STRAND_RAD) {
   const ring = STRAND_RAD + 1, tube = (STRAND_SEG + 1) * ring, per = tube + ring + 1, n = STRAND_LAYOUT.length;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(per * n * 3), 3).setUsage(THREE.DynamicDrawUsage));
@@ -256,6 +259,7 @@ function strandsGeometry() {
     for (let j = 0; j < STRAND_RAD; j++) idx.push(c, r + j, r + j + 1);
   }
   geo.setIndex(idx);
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity); // rebuilt every frame and never culled: no per-frame bounds walk
   return geo;
 }
 
@@ -267,7 +271,7 @@ function legendTexture(color = "#c21d19", ink = "rgba(255, 232, 224, 0.62)") {
   const g = c.getContext("2d");
   g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = ink;
-  g.font = "500 58px 'Instrument Sans', ui-sans-serif, system-ui, sans-serif";
+  g.font = "500 58px 'DM Sans', Arial, sans-serif";
   g.textBaseline = "middle";
   // uv runs tip → tail (screen-left) and around the tube downward on screen, so the legend is drawn
   // rotated 180°: it then reads left to right, upright, on the camera-facing side (v = 0.25)

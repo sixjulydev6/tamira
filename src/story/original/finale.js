@@ -53,7 +53,7 @@ function labelTexture(renderer) {
   g.fillStyle = '#cfcdc7';
   g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = '#4a4c50';
-  g.font = '500 84px "DM Mono", ui-monospace, monospace';
+  g.font = '500 84px "DM Sans", Arial, sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   const step = (1.05 / 3.4) * 1024;

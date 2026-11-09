@@ -283,6 +283,17 @@ function runStory() {
       labelEls[id].style.visibility = a ? "visible" : "hidden";
       if(!a)continue;
       labelEls[id].style.transform = `translate3d(${a.x.toFixed(1)}px, ${a.y.toFixed(1)}px, 0)`;
+      // strand labels: slide the tag back inside the screen when the pin sits near an edge (phones); the pin
+      // and its leader stay on the wire. Measured from the tag's own size, so it holds for any copy length.
+      if(!id.startsWith('bundle')){
+        const tag=labelEls[id].querySelector('.label__tag'),m=12,w=tag.offsetWidth,left=a.x+12;
+        const dx=Math.min(0,innerWidth-m-(left+w))+Math.max(0,m-left);
+        // and below the chapter copy (short phones): the tag's top sits 52px + its height above the pin
+        const cr=chapterEls.find(c=>c.id==='strands')?.el.getBoundingClientRect(),tl=left+dx;
+        const under=cr&&tl<cr.right&&tl+w>cr.left;   // only when the tag sits under the copy's column
+        const dy=under?Math.max(0,cr.bottom+8-(a.y-52-tag.offsetHeight)):0;
+        tag.style.translate=dx||dy?`${dx.toFixed(1)}px ${dy.toFixed(1)}px`:'';
+      }
       if(id.startsWith('bundle')) {
         const index=Object.keys(bundlePaths).indexOf(id),phone=innerWidth<760;
         const margin=phone?32:60,gap=phone?16:24,cols=phone?2:4;

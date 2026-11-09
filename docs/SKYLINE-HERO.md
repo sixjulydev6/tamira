@@ -114,3 +114,16 @@ The room no longer builds up from the floor late in `run` (it appeared at 66% of
 ## Outro: back to the hero tower (2026-11-06, user direction)
 
 New last segment `outro` (3 screens) after `room`. The rendered room has already faded to the dark page colour; the city canvas returns under it (`main.js`), the room element fades out over outro 0–0.07, and the skyline renders again (`scene.js`, which also keeps ticking it). User direction: no x-ray or floating-room frame, just the building, with a clearly visible zoom out. `skyline/index.js` keeps the city solid, lifts night to the sunset palette (`OUT_RISE` 0.45) over outro 0.1–0.75, and `outroCamera()` zooms out along the hero shot's line of sight from 45 m off the facade where the tower room is (`ROOM_VIEW.tgt`) to the rig's establishing pose (log distance, ease-out over outro 0–0.85, so it is already moving while the living room fades). The contact section (`.story.is-live-3d ~ .end`) overlaps the story's last screen with a scrim, so its copy rises over the final frame and the page ends at progress 1. Static/reduced-motion layout is unchanged.
+
+## Phone scroll performance (2026-11-09)
+
+Measured on an emulated phone (390x844, 4x CPU throttle; headless Chrome caps rAF at 30 fps unless run with `--disable-gpu-vsync --disable-frame-rate-limit`). Fixes:
+- The city was drawn twice per frame while scrolling (the scroll timeline's `story.update` and the ticker's `skyline.tick` both rendered). `scene.js` now only updates there; the ticker draws once. The resolution step-down draws explicitly after its resize.
+- The `uPR` scene walk in `skyline.update` runs only when the pixel ratio or scene changes.
+- Bundle/drain: ~70% of CPU was rebuilding cable meshes per frame plus `computeBoundingSphere` over every vertex. Wire geometries now carry a fixed infinite bounding sphere (they are never frustum-culled), and the blue/green bundle cores use `new Wire({detail:.5})` (about 19k instead of 61k vertices each; same look at phone and desktop sizes). The red core stays full detail (it becomes the product wire).
+- Shadow map re-renders only when the sun moves about 0.35 deg (1 deg on phones) and not after sunset; `castShadow` stays constant to avoid shader recompiles.
+Remaining: first-use shader compiles (up to ~400 ms) if the visitor scrolls into the x-ray, bundle or product chapters before the idle warm-up (after the room GLB loads) has run.
+
+## Phone layout (2026-11-09, user direction)
+
+Under 768px wide: no inset frame (`--frame-inset`/`--frame-radius` 0), the stage is `100lvh` so it still fills the screen when the browser toolbar hides, and the hero copy is smaller and scaled by height as well as width (headline 26–36px, sentence 14–16px) so it stays in the sky above the tower's crown down to 360x640. Short phones (height ≤ 700px) get tighter chapter copy and a lower heat gauge. Strand labels (`main.js`) slide back inside the screen edges and below the chapter copy when they would collide. Checked at 360x640, 375x667, 390x844, 412x915, 430x932, 768x1024, 820x1180 and 1440x900.

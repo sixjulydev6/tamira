@@ -192,8 +192,10 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     const out = { anchors: null };
     const outro = local(p, "outro");
     if (wireIn < 0.5 || outro > 0) {
+      // Draw once per frame: the ticker (tick) renders the city right after this update. Rendering here
+      // as well drew the whole city twice a frame while scrolling (halving the frame rate on phones).
       skyline.update(p, bg, { points: shapeWorld.entry, d0 });
-      skyline.render();
+      if (!skyline.loaded) skyline.render();
       if(local(p,'bundle')>0&&local(p,'drain')===0)out.anchors=skyline.bundleAnchors();
     }
     const finale = local(p, "finale");
@@ -264,6 +266,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PR_STEPS[prStep]));
       resize();
       update(lastProgress, { bg: lastBgColor });   // resizing clears the canvas: redraw now, or that frame shows blank
+      if (local(lastProgress, "wireIn") < .5 || local(lastProgress, "outro") > 0) skyline.render();
       frames = 0; slowFrames = 0;
       return;
     }

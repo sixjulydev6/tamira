@@ -137,7 +137,7 @@ export function createSkyline(renderer) {
   const bridgeWire=new Wire();bridgeScene.add(bridgeWire.group);
   const assembly=createCableAssembly(bridgeWire);bridgeScene.add(assembly.group);assembly.hide();
   const bridgeCamera=new THREE.PerspectiveCamera(28,1,.001,2400);
-  let aoKey='',gui=null,loaded=false,disposed=false,error=null,elapsed=0,lastP=0,lastBg='#ffffff',entry=null,lastShadowNight=-1;
+  let lastPR=0,lastKids=0,aoKey='',gui=null,loaded=false,disposed=false,error=null,elapsed=0,lastP=0,lastBg='#ffffff',entry=null,lastShadowNight=-1;
   const ownedTextures=new Set();
   const url=import.meta.env.BASE_URL+'skyline/';
   // Sky reflections for the city only (the cable bridge keeps its own RoomEnvironment).
@@ -149,9 +149,12 @@ export function createSkyline(renderer) {
   // The city GLB is meshopt-compressed with 16-bit positions (KHR_mesh_quantization; shaders read world space via modelMatrix). The sky HDRI starts
   // downloading at the same moment as the GLB instead of after it is parsed, so the two share the pipe
   // and neither waits on the other; the loader's number is the bytes of both.
-  const GLB_BYTES=1211436,HDR_BYTES=421206;
+  // Phones (coarse pointer) light the city from a 256x128 copy of the sky HDRI (2x2 float average of the 512; same mean
+  // radiance): 99 KB instead of 337 KB brotli, ~1.3 s sooner on Slow 4G. ?hdr=512|256 overrides, for comparisons.
+  const HDR=new URLSearchParams(location.search).get('hdr')||(matchMedia('(pointer:coarse)').matches?'256':'512');
+  const GLB_BYTES=1211436,HDR_BYTES=HDR==="256"?131121:421206;
   let glbFrac=0,hdrFrac=0;
-  const envFile=new RGBELoader().loadAsync(url+'day-env-512.hdr',e=>{hdrFrac=Math.min(1,e.loaded/(e.lengthComputable&&e.total?e.total:HDR_BYTES));});
+  const envFile=new RGBELoader().loadAsync(url+'day-env-'+HDR+'.hdr',e=>{hdrFrac=Math.min(1,e.loaded/(e.lengthComputable&&e.total?e.total:HDR_BYTES));});
   envFile.catch(()=>{});
   const texCache=new Map(); // one Texture per file: the four facade glasses share facade_COL instead of decoding and uploading it four times
   const texReady=[]; // first-view surface textures: the opening waits for them so nothing pops in under the reveal
@@ -279,8 +282,15 @@ export function createSkyline(renderer) {
   // direction (panel or dusk descent) keeps the whole shadowed area inside it.
   const SHADOW_BOX=new THREE.Box3(new THREE.Vector3(-260,0,-310),new THREE.Vector3(260,220,770));
   const fitCam=new THREE.OrthographicCamera(),corner=new THREE.Vector3(),lastSunDir=new THREE.Vector3();
+  // Phones: re-rendering the whole city's shadow map every frame while the sun sets was the main scroll
+  // hitch. Re-render only once the sun has moved a visible step (about 0.35 deg desktop, 1 deg phones),
+  // and stop updating the shadow map once the sun is down (intensity ~0 at night and in the x-ray).
+  const SHADOW_STEP=1-Math.cos((matchMedia('(pointer:coarse)').matches?1:.35)*Math.PI/180);
   function fitShadow(){
-    if(lastSunDir.distanceToSquared(skyU.uSunDir.value)<1e-10)return;lastSunDir.copy(skyU.uSunDir.value);
+    // castShadow stays constant (toggling it recompiles every city shader); after sunset the map just stops updating
+    if(sun.castShadow!==TUNE.shadows){sun.castShadow=TUNE.shadows;lastSunDir.set(0,0,0);}
+    if(!TUNE.shadows||sun.intensity<.02)return;
+    if(1-lastSunDir.dot(skyU.uSunDir.value)<SHADOW_STEP)return;lastSunDir.copy(skyU.uSunDir.value);
     fitCam.position.copy(sun.position);fitCam.lookAt(sun.target.position);fitCam.updateMatrixWorld();
     const inv=fitCam.matrixWorldInverse,b=new THREE.Box3();
     for(let i=0;i<8;i++){corner.set(i&1?SHADOW_BOX.max.x:SHADOW_BOX.min.x,i&2?SHADOW_BOX.max.y:SHADOW_BOX.min.y,i&4?SHADOW_BOX.max.z:SHADOW_BOX.min.z).applyMatrix4(inv);b.expandByPoint(corner);}
@@ -317,7 +327,8 @@ export function createSkyline(renderer) {
     const recede=1-Math.max(smooth(0,.35,climb)*.55,smooth(0,.25,follow)*.85);
     CITY_U.uEdge.value=smooth(.05,.5,scan)*(.4+.6*recede)*(1-S.enter*.9)*(1-smooth(0,.55,drain));
     CITY_U.uDim.value=Math.max(S.isolate*.55,smooth(.55,1,follow)*.7,S.enter*.92);
-    scene.traverse(o=>{if(o.material?.uniforms?.uPR)o.material.uniforms.uPR.value=renderer.getPixelRatio();});
+    // point sizes follow the pixel ratio; walk the scene only when it changes (the walk is costly on phones)
+    if(renderer.getPixelRatio()!==lastPR||scene.children.length!==lastKids){lastPR=renderer.getPixelRatio();lastKids=scene.children.length;scene.traverse(o=>{if(o.material?.uniforms?.uPR)o.material.uniforms.uPR.value=lastPR;});}
     wiring.update();room.update();ground.update();
     // depth of field: focus a little past the tower, far city softens; establishing shots only
     const dU=depthBlur.material.uniforms,dHero=camera.position.distanceTo(HERO_C);
@@ -329,13 +340,13 @@ export function createSkyline(renderer) {
       const key=[A.radius,A.thickness,A.distanceExponent,A.falloff,A.scale,A.samples].join();
       if(key!==aoKey){aoKey=key;ao.updateGtaoMaterial({radius:A.radius,thickness:A.thickness,distanceExponent:A.distanceExponent,distanceFallOff:A.falloff,scale:A.scale,samples:TUNE.ao.samples??12});}}
     bloom.enabled=TUNE.bloom.on;bloom.strength=TUNE.bloom.strength;bloom.radius=TUNE.bloom.radius;bloom.threshold=TUNE.bloom.threshold;
-    sun.castShadow=TUNE.shadows;sun.shadow.bias=TUNE.shadowBias;sun.shadow.normalBias=TUNE.shadowNormalBias;
+    sun.shadow.bias=TUNE.shadowBias;sun.shadow.normalBias=TUNE.shadowNormalBias;
     for(const o of entryMeshes)o.visible=S.room<.001&&S.climb<.6;
     const envK=1-.85*smooth(.1,.8,S.night);
     const envRot=(dayEnvTarget?-Math.atan2(Math.cos(TUNE.sunAz*Math.PI/180),Math.sin(TUNE.sunAz*Math.PI/180)):0)+TUNE.envRotate*Math.PI/180;
     for(const m of cityMaterials){m.envMapIntensity=m.userData.env*envK*TUNE.envGain;m.envMapRotation.y=envRot;}
     const night=S.night*DUSK;
-    if(night!==lastShadowNight){renderer.shadowMap.needsUpdate=true;lastShadowNight=night;}
+    // (shadow re-renders are driven by the sun direction in fitShadow, quantised; see there)
     for(const [a,b] of [['zenith','uZenith'],['mid','uMid'],['horizon','uHorizon'],['sun','uSunCol'],['glow','uGlow']])sample(a,night,skyU[b].value);
     skyU.uNight.value=night;skyU.uXray.value=S.xray;skyU.uTime.value=elapsed;skyU.uDim.value=smooth(.1,.8,S.enter)*.85;
     const elev=THREE.MathUtils.degToRad(lerp(TUNE.sunElev,-7,smooth(0,.72,night))),az=TUNE.sunAz*Math.PI/180;
@@ -343,8 +354,7 @@ export function createSkyline(renderer) {
     for(const [a,b] of [['uZenith','uSkyZen'],['uMid','uSkyMid'],['uHorizon','uSkyHor'],['uSunCol','uSkySun'],['uGlow','uSkyGlow'],['uSunDir','uSkySunDir']])CITY_U[b].value.copy(skyU[a].value);
     CITY_U.uSkyNight.value=night;CITY_U.uSkyXray.value=S.xray;CITY_U.uSkyDim.value=skyU.uDim.value;
     sky.position.copy(camera.position);sun.position.copy(skyU.uSunDir.value).multiplyScalar(600).add(sun.target.position);
-    fitShadow();
-    sample('sun',night,sun.color);sun.intensity=sample('sunI',night)*(1-S.xray*.8);
+    sample('sun',night,sun.color);sun.intensity=sample('sunI',night)*(1-S.xray*.8);fitShadow();
     sample('hemiSky',night,hemi.color);sample('hemiGround',night,hemi.groundColor);hemi.intensity=sample('hemiI',night)*(1-S.xray*.55);
     {const f=TUNE.fill,fa=f.az*Math.PI/180,fe=f.elev*Math.PI/180;fill.visible=f.on;fill.color.set(f.color);
       fill.intensity=f.intensity*(1-smooth(0,.7,night))*(1-S.xray*.9);

@@ -7,13 +7,13 @@
   <meta name="description" content="Tamira makes wiring and cable for homes, industry and infrastructure.">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preload" as="font" type="font/woff2" href="/fonts/InstrumentSans-400.woff2" crossorigin>
-  <link rel="preload" as="font" type="font/woff2" href="/fonts/InstrumentSans-500.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/DMSans-latin.woff2" crossorigin>
   <!-- The opening's heavy files start downloading with the page instead of after the 3D chunk has run:
        the city GLB and sky HDRI (fetched by GLTFLoader/RGBELoader with same-origin credentials, so
        crossorigin matches and the preload is reused) and the first-view surface textures (plain <img> loads). -->
   <link rel="preload" as="fetch" crossorigin fetchpriority="low" href="/skyline/city-v2.glb">
-  <link rel="preload" as="fetch" crossorigin fetchpriority="low" href="/skyline/day-env-512.hdr">
+  <link rel="preload" as="fetch" crossorigin fetchpriority="low" href="/skyline/day-env-512.hdr" media="(pointer: fine)">
+  <link rel="preload" as="fetch" crossorigin fetchpriority="low" href="/skyline/day-env-256.hdr" media="(pointer: coarse)">
   <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/facade-office/facade_COL.webp">
   <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/brick-reclaimed/brick_COL.webp">
   <link rel="preload" as="image" crossorigin fetchpriority="low" href="/skyline/tex/brick-reclaimed/brick_NRM.webp">
@@ -48,7 +48,7 @@
       </div>
     </div>
     <div class="loader__foot" aria-hidden="true">
-      <p class="loader__line">Running power through the city</p>
+      <p class="loader__line">Running power through the city<span class="loader__eta">&nbsp;</span></p>
       <p class="loader__count"><span class="loader__count-value">0</span>%</p>
     </div>
   </div>

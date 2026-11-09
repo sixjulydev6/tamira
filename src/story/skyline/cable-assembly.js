@@ -53,7 +53,7 @@ function farRun() {
 function jacketPrint() {
   const canvas = document.createElement('canvas');canvas.width = 2048;canvas.height = 512;
   const ctx = canvas.getContext('2d');ctx.fillStyle = '#ece9e3';ctx.fillRect(0, 0, 2048, 512);
-  ctx.fillStyle = 'rgba(70, 70, 66, 0.82)';ctx.font = '500 26px "Instrument Sans", sans-serif';
+  ctx.fillStyle = 'rgba(70, 70, 66, 0.82)';ctx.font = '500 26px "DM Sans", Arial, sans-serif';
   ctx.fillText('TAMIRA     3 CORE  1.5 SQ MM     HR-FR-LSH     1100 V', 80, 160);
   const map = new THREE.CanvasTexture(canvas);map.colorSpace = THREE.SRGBColorSpace;
   map.wrapS = map.wrapT = THREE.RepeatWrapping;map.anisotropy = 8;
@@ -158,8 +158,8 @@ export function createCableAssembly(redWire) {
   bedding.add(new THREE.Mesh(sleeve(BED_R,-40,0),bed),new THREE.Mesh(beddingFace(),fillerCut));
   const cores=[
     {id:'red',wire:redWire,angle:Math.PI/6},
-    {id:'blue',wire:new Wire({color:'#2856a8',capColor:'#3a61ac',ink:'rgba(0,0,0,0)'}),angle:5*Math.PI/6},
-    {id:'green',wire:new Wire({color:'#1a6633',capColor:'#2b7a45',ink:'rgba(0,0,0,0)'}),angle:3*Math.PI/2},
+    {id:'blue',wire:new Wire({color:'#2856a8',capColor:'#3a61ac',ink:'rgba(0,0,0,0)',detail:.5}),angle:5*Math.PI/6},
+    {id:'green',wire:new Wire({color:'#1a6633',capColor:'#2b7a45',ink:'rgba(0,0,0,0)',detail:.5}),angle:3*Math.PI/2},
   ];
   // The red stays in the same scene as the extraction wire. Blue/green are local
   // to the assembly and keep their positions when red is pulled out.

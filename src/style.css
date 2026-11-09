@@ -1,12 +1,13 @@
-/* Instrument Sans (SIL OFL), latin subset, self-hosted: no third-party round trips before first text */
-@font-face { font-family: "Instrument Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/InstrumentSans-400.woff2") format("woff2"); }
-@font-face { font-family: "Instrument Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/InstrumentSans-500.woff2") format("woff2"); }
+/* DM Sans (SIL OFL, Google Fonts), latin subset, one variable file (weights 100-1000, optical size
+   9-40, applied automatically by font size), self-hosted:
+   no third-party round trips before first text. Used everywhere: headings and copy. */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 100 1000; font-display: swap; src: url("/fonts/DMSans-latin.woff2") format("woff2"); }
 /* ------------------------------------------------------------------
    Tamira — hero
    Day → night is driven by one variable, --night (0 → 1), set from scroll.
    ------------------------------------------------------------------ */
 
-/* Headings use Georgia, a system font (macOS, Windows, iOS): nothing to download. */
+/* Headings and copy both use DM Sans. */
 
 :root {
   --red: #ea3c32;          /* contact accent (sampled from the reference); the logo carries its own #F45E5E */
@@ -30,7 +31,7 @@
   --pad-x: calc(var(--space) * 5);
   --page-x: max(var(--pad-x), calc((100% - var(--container)) / 2));
   --header-height: 5rem;
-  --font-serif: Georgia, "Times New Roman", Times, serif;   /* headings: hero, chapters, contact, gauge */
+  --font-serif: "DM Sans", Arial, Helvetica, sans-serif;   /* headings: hero, chapters, contact, gauge */
   --font-hero: var(--font-serif);
   /* Content edge for everything below the hero copy: the framed city's side margin (same formula as
      main.js layoutFrame), so chapter copy, gauge and contact line up with the frame's edges. */
@@ -62,11 +63,11 @@
   --leading-body: 1.5;
   --leading-body-20: 1.3;
   --leading-nav: 1.2;
-  --tracking-heading: -0.03em;
+  --tracking-heading: -0.01em;   /* DM Sans is tight at large sizes; -0.03em made letters touch */
   --tracking-small: 0.01em;
   --radius-xs: 2px;
 
-  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", Arial, Helvetica, sans-serif;
 
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -192,12 +193,22 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
   line-height: 1.25;
   letter-spacing: -0.01em;
 }
+.loader__eta {                   /* time left until the opening shows (src/loader.js); space is kept so the line never jumps */
+  display: block;
+  margin-top: 0.4em;
+  font-size: 0.75em;
+  opacity: 0;
+  color: color-mix(in srgb, currentColor 55%, transparent);
+  font-variant-numeric: tabular-nums;
+  transition: opacity 400ms ease;
+}
+.loader__eta.is-shown { opacity: 1; }
 .loader__count {
   margin: 0;
   font-family: var(--font-serif);
   font-size: clamp(4.5rem, 2rem + 12vw, 14rem);
   line-height: 0.8;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -245,7 +256,7 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
   position: relative;
   display: inline-flex;
   align-items: center;
-  font-size: 0.8125rem;            /* 13px Instrument Sans: the reference's small uppercase controls */
+  font-size: 0.8125rem;            /* 13px DM Sans: the reference's small uppercase controls */
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0.06em;
@@ -313,7 +324,11 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
 .story__stage {
   position: sticky;
   top: 0;
-  height: 100svh;
+  /* the largest viewport (browser toolbars collapsed): with 100svh, a strip of page showed under the stage
+     whenever iOS Safari hid its toolbar while scrolling. lvh is constant, so the canvas never resizes as the
+     toolbar moves; anything anchored to the bottom stays inside the smallest viewport (see .gauge). */
+  height: 100vh;
+  height: 100lvh;
   overflow: hidden;
 }
 
@@ -393,7 +408,7 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
   font-weight: 400;
   font-size: clamp(2.5rem, 1.52rem + 3.36vw, 5.6rem); /* 40 → 89.6; 20% smaller */
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;    /* DM Sans is already tight at display sizes */
   color: var(--ink);
 }
 /* the tight leading would clip descenders inside the reveal mask; pad the mask, pull the next line back */
@@ -549,6 +564,7 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
   z-index: 3;
   right: var(--content-x);
   bottom: clamp(32px, 9svh, 96px);
+  bottom: calc(100lvh - 100svh + clamp(32px, 9svh, 96px));   /* above the toolbar when it is showing */
   width: min(22rem, calc(100% - 2 * var(--content-x)));
   display: grid;
   gap: calc(var(--space) * 2);
@@ -696,6 +712,18 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
 
 /* ------------------------------------------------------------------ small screens */
 
+/* Phones: the hero fills the screen edge to edge (user direction 2026-11-09); the rounded inset frame
+   stays on tablets and desktop. main.js reads these values, so the opening animation simply has nothing to open. */
+@media (max-width: 767px) {
+  :root { --frame-inset: 0px; --frame-radius: 0px; }
+  /* Hero copy on phones (user direction 2026-11-09): smaller, and scaled by the screen's height as well as its
+     width, so it stays in the sky above the tower's crown on short phones (360x640, 375x667) too. The copy
+     starts just under the header (64px bar at 12px). */
+  .hero__copy { padding-top: calc(76px + clamp(14px, 3.2svh, 30px)); }
+  .hero__title { font-size: clamp(1.625rem, min(7.4vw, 4.6svh), 2.25rem); line-height: 1.04; }   /* 26 -> 36 */
+  .hero__lede { margin-top: clamp(0.625rem, 1.6svh, 1rem); font-size: clamp(0.875rem, min(3.9vw, 2.3svh), 1rem); line-height: 1.3; }   /* 14 -> 16 */
+}
+
 @media (max-width: 1023px) {
   /* one compact frosted header across the frame, with a dark menu toggle */
   .site-header {
@@ -766,7 +794,14 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
 
 /* Keep the heat readout above the cable/heater on portrait screens. */
 @media (max-aspect-ratio: 9/10) {
-  .gauge { bottom: 36svh; }
+  .gauge { bottom: calc(100lvh - 100svh + 36svh); }
+}
+/* short phones (360x640, 375x667): tighter chapter copy and a lower gauge, so the readout clears the copy */
+@media (max-width: 767px) and (max-height: 700px) {
+  .chapter { top: calc(var(--header-height) + 16px); }
+  .chapter__title { font-size: 1.5rem; }
+  .chapter__body { font-size: 0.9375rem; line-height: 1.45; }
+  .gauge { bottom: calc(100lvh - 100svh + 31svh); gap: 6px; }
 }
 
 /* Original room finale: one canvas, multiresolution images and five cumulative light states. */

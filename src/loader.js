@@ -4,7 +4,15 @@
 
    Progress is set from real work (fonts, the poster, the 3D chunk, the city GLB's bytes, the first
    render). The shown value eases toward it and holds at 99 until finish(). Without script the
-   loader never shows (index.html adds .is-loading only when script runs). */
+   loader never shows (index.html adds .is-loading only when script runs).
+
+   The line under the sentence estimates the time left until the opening is up (not the whole site:
+   the room and later chapters keep loading after the reveal). The progress number is too lumpy for
+   that (the 3D chunk and textures add nothing until they finish, preloaded files land at once), so
+   the estimate is bytes: what the opening downloads (OPENING_BYTES) less what has arrived (Resource
+   Timing), over the download speed (the faster of the measured rate and the browser's own
+   connection estimate, since in-flight bytes are not yet counted). Capped by MAX_WAIT_MS.
+   */
 
 const MIN_SHOWN_MS = 2200;     // a cached visit still reads as a deliberate beat, not a flash
 const MAX_WAIT_MS = 15000;     // never hold the page: past this the hero shows with its poster
@@ -13,6 +21,14 @@ const EASE_RATE = 3.2;         // per second: how quickly the shown value settle
 const HOLD_FULL_MS = 80;      // a beat at 100% before the tip runs off
 const RUN_OFF_MS = 600;
 const LIFT_MS = 1300;
+// Bytes transferred before the opening shows (production build, brotli): JS + CSS + fonts, poster,
+// city-v2.glb, day-env-512.hdr and the first-view textures. Measured 2026-11-09 at 1.36 MB (with DM Sans); update
+// it when the opening's assets change (performance.getEntriesByType("resource") after the reveal).
+const OPENING_BYTES = 1.36e6;
+const AFTER_BYTES_S = 0.6;     // parse, upload and the first render once the bytes are in
+const LATER = /\/room|\/favicon/;   // loaded for later chapters, not the opening
+const ETA_FIRST_MS = 700;      // no estimate before this much data
+const ETA_EVERY_MS = 250;
 
 export function createLoader(el) {
   const root = document.documentElement;
@@ -22,11 +38,44 @@ export function createLoader(el) {
   }
   const cable = el.querySelector(".loader__cable");
   const count = el.querySelector(".loader__count-value");
+  const eta = el.querySelector(".loader__eta");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const started = performance.now();
   const callbacks = [], revealed = [];
   let isRevealed = false;
   let target = 0, shown = 0, finishing = false, done = false, raf = 0, last = 0;
+  let etaSec = null, etaAt = 0, etaText = "";
+  const setEta = (text) => {
+    if (!eta || text === etaText) return;
+    etaText = text;
+    if (text) eta.textContent = text;
+    eta.classList.toggle("is-shown", !!text);
+  };
+  const updateEta = (now) => {
+    if (finishing) { setEta(""); return; }
+    if (now - etaAt < ETA_EVERY_MS) return;
+    etaAt = now;
+    if (now - started < ETA_FIRST_MS || !performance.getEntriesByType) return;
+    let got = 0, from = Infinity;
+    for (const e of performance.getEntriesByType("resource")) {
+      if (LATER.test(e.name)) continue;
+      from = Math.min(from, e.startTime);
+      got += e.transferSize || e.encodedBodySize || 0;   // cached files report no transfer
+    }
+    if (!(from < now)) return;
+    const measured = got / ((now - from) / 1000);                   // bytes per second, a lower bound
+    const reported = (navigator.connection?.downlink || 0) * 125000;   // Mbps, Chromium only
+    const speed = Math.max(measured, reported);
+    if (!speed) return;
+    const capLeft = Math.max(0, MAX_WAIT_MS - (now - started));   // the loader never waits past this
+    const minLeft = Math.max(0, MIN_SHOWN_MS - (now - started));
+    const raw = Math.max(minLeft / 1000, Math.min(capLeft / 1000, Math.max(0, OPENING_BYTES - got) / speed + AFTER_BYTES_S));
+    // settle toward the new figure, and count down on its own between samples
+    const ticked = etaSec == null ? raw : Math.max(0, etaSec - ETA_EVERY_MS / 1000);
+    etaSec = ticked + (raw - ticked) * 0.25;
+    const s = Math.ceil(etaSec);
+    setEta(s <= 2 ? "Almost there" : `About ${s} seconds left`);
+  };
 
   const draw = (p) => {
     // the cable is one screen long; at p its copper tip has crossed p of the screen, so at 100%
@@ -45,6 +94,7 @@ export function createLoader(el) {
     if (Math.abs(goal - shown) < (finishing ? 0.004 : 0.0005)) shown = goal;   // no slow crawl from 99.6 to 100
     draw(shown);
     count.textContent = String(Math.round(shown * 100));
+    updateEta(now);
     if (finishing && shown >= 1) { setTimeout(runOff, reduce ? 0 : HOLD_FULL_MS); return; }
     raf = requestAnimationFrame(frame);
   };
