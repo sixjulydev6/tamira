@@ -70,7 +70,8 @@ const labelEls = Object.fromEntries(LABELS.map((l) => {
 }));
 const bundleLeaders=document.createElementNS('http://www.w3.org/2000/svg','svg');
 bundleLeaders.classList.add('bundle-leaders');bundleLeaders.setAttribute('aria-hidden','true');
-const bundlePaths=Object.fromEntries(LABELS.filter(l=>l.id.startsWith('bundle')).map(l=>{
+// one leader path per label: the bundle labels always, the strand labels on phones (stacked, see render)
+const bundlePaths=Object.fromEntries(LABELS.map(l=>{
   const path=document.createElementNS('http://www.w3.org/2000/svg','path');bundleLeaders.append(path);return [l.id,path];
 }));
 labelsEl.prepend(bundleLeaders);
@@ -219,6 +220,29 @@ function runStory() {
   };
   gsap.ticker.add(animateTraffic);
 
+  // Phone layout for the three strand tags: equal rows under the chapter copy. Rows are assigned to pins by the
+  // shortest total leader length (tried over all 6 orders), which keeps the leaders from crossing each other.
+  const STRAND_TAGS = ["strands", "jacket", "rating"];
+  function stackStrandTags(anchors) {
+    if (!STRAND_TAGS.every((id) => anchors[id])) return null;
+    const cr = chapterEls.find((c) => c.id === "strands")?.el.getBoundingClientRect();
+    const x = cr ? cr.left : 20, top0 = (cr ? cr.bottom : innerHeight * 0.4) + 14, ROW = 50, GAP = 6;
+    const size = Object.fromEntries(STRAND_TAGS.map((id) => { const t = labelEls[id].querySelector(".label__tag"); return [id, [t.offsetWidth, t.offsetHeight]]; }));
+    const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    let best = null, bestLen = Infinity;
+    for (const o of orders) {
+      let len = 0;
+      const out = {};
+      o.forEach((k, row) => {
+        const id = STRAND_TAGS[k], [w, h] = size[id], top = top0 + row * (ROW + GAP), ex = x + w, ey = top + h / 2, a = anchors[id];
+        len += Math.hypot(a.x - ex, a.y - ey);
+        out[id] = { x, top, d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} L ${ex.toFixed(1)} ${ey.toFixed(1)}` };
+      });
+      if (len < bestLen) { bestLen = len; best = out; }
+    }
+    return best;
+  }
+
   function render(p) {
     const { bg, ink, dark } = pageColors(p);
     if (bg !== lastBg) {
@@ -278,15 +302,28 @@ function runStory() {
     const la = Math.max(windowed(local(p, "strands"), 0.36, 0.5, 0.76, 0.88),windowed(local(p,"bundle"),.48,.65,.85,.98));
     labelsEl.style.opacity = la.toFixed(3);
     labelsEl.style.visibility = la > 0.001 && anchors ? "visible" : "hidden";
+    const stacked = anchors && la > 0.001 && innerWidth < 760 ? stackStrandTags(anchors) : null;
     if (anchors && la > 0.001) for (const id in labelEls) {
       const a = anchors[id];
       labelEls[id].style.visibility = a ? "visible" : "hidden";
-      if(!a)continue;
+      if(!a){bundlePaths[id].setAttribute('d','');continue;}   // no stale leader from another chapter
       labelEls[id].style.transform = `translate3d(${a.x.toFixed(1)}px, ${a.y.toFixed(1)}px, 0)`;
       // strand labels: slide the tag back inside the screen when the pin sits near an edge (phones); the pin
       // and its leader stay on the wire. Measured from the tag's own size, so it holds for any copy length.
       if(!id.startsWith('bundle')){
-        const tag=labelEls[id].querySelector('.label__tag'),m=12,w=tag.offsetWidth,left=a.x+12;
+        const tag=labelEls[id].querySelector('.label__tag'),phone=innerWidth<760;
+        labelEls[id].classList.toggle('label--stacked',phone);
+        if(phone){
+          // Phones: the three strand tags overlapped each other's pins and leaders where the wire crosses the
+          // narrow screen. They sit in equal rows just under the chapter copy (left column), each joined to its
+          // pin by a drawn leader; see stackStrandTags for the row order.
+          const L=stacked?.[id];if(!L)continue;
+          tag.style.translate=`${(L.x-(a.x+12)).toFixed(1)}px ${(L.top-(a.y-52-tag.offsetHeight)).toFixed(1)}px`;
+          bundlePaths[id].setAttribute('d',L.d);
+          continue;
+        }
+        bundlePaths[id].setAttribute('d','');
+        const m=12,w=tag.offsetWidth,left=a.x+12;
         const dx=Math.min(0,innerWidth-m-(left+w))+Math.max(0,m-left);
         // and below the chapter copy (short phones): the tag's top sits 52px + its height above the pin
         const cr=chapterEls.find(c=>c.id==='strands')?.el.getBoundingClientRect(),tl=left+dx;
@@ -306,7 +343,7 @@ function runStory() {
         bundlePaths[id].setAttribute('d',`M ${a.x} ${a.y} L ${x+width/2} ${y-12} L ${x+width/2} ${y}`);
       }
     }
-    bundleLeaders.style.visibility=anchors?.bundleSheath&&la>.001?'visible':'hidden';
+    bundleLeaders.style.visibility=(anchors?.bundleSheath||(anchors&&innerWidth<760))&&la>.001?'visible':'hidden';
 
     // temperature gauge
     const h = local(p, "heat");

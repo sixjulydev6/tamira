@@ -96,6 +96,8 @@ export function createSkyline(renderer) {
   sky.renderOrder=-10; sky.frustumCulled=false; scene.add(sky);
   const ground = createGround(renderer);scene.add(ground.group);
   // The scene target carries a depth texture so the distance blur can read it.
+  // The composer draws into this target, so the canvas's own antialias never applies. scene.js sets its MSAA per
+  // stretch of the story (setMSAA): on for the network, room and cable close-ups, whose edges otherwise stair-step.
   const sceneTarget=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType});
   sceneTarget.depthTexture=new THREE.DepthTexture(1,1);
   const composer=new EffectComposer(renderer,sceneTarget);
@@ -135,7 +137,7 @@ export function createSkyline(renderer) {
     const light=new THREE.DirectionalLight(color,power);light.position.fromArray(pos).applyMatrix4(rotation);bridgeScene.add(light);
   }
   const bridgeWire=new Wire();bridgeScene.add(bridgeWire.group);
-  const assembly=createCableAssembly(bridgeWire);bridgeScene.add(assembly.group);assembly.hide();
+  const assembly=createCableAssembly(bridgeWire,renderer.capabilities.maxTextureSize);bridgeScene.add(assembly.group);assembly.hide();
   const bridgeCamera=new THREE.PerspectiveCamera(28,1,.001,2400);
   let lastPR=0,lastKids=0,aoKey='',gui=null,loaded=false,disposed=false,error=null,elapsed=0,lastP=0,lastBg='#ffffff',entry=null,lastShadowNight=-1;
   const ownedTextures=new Set();
@@ -461,7 +463,9 @@ export function createSkyline(renderer) {
     bridgeTarget.dispose();for(const root of [scene,bridgeScene,fadeScene,compositeScene])root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)ownedTextures.add(v);}if(o.isInstancedMesh)o.dispose();});
     geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());ownedTextures.forEach(t=>t.dispose());sun.shadow.dispose();environment.dispose();cityEnvTarget.dispose();dayEnvTarget?.dispose();composer.passes.forEach(p=>p.dispose?.());composer.dispose();for(const t of [composer.renderTarget1,composer.renderTarget2])t.depthTexture?.dispose();
   }
-  return {ready,resize,update,render,dispose,get progress(){return loaded?1:progressNow();},bundleAnchors(){return assembly.anchors(bridgeCamera,size.width,size.height);},get loaded(){return loaded;},get error(){return error;},tick(dt){elapsed+=Math.min(dt,.05);update(lastP,lastBg,entry);render();},diagnostics(){return {loaded,error:error?.message,state:{...S},camera:camera.position.toArray(),roomVisible:room.group.visible,roomSource:room.source,entryVisible:entryMeshes.some(o=>o.visible),cityMaterials:cityMaterials.length,kitTrees:kitTrees.map(o=>o.count),dayEnvironment:!!dayEnvTarget,assembly:assembly.diagnostics(),redPosition:bridgeWire.group.position.toArray()};}};
+  // MSAA sample count of the composer's scene targets; takes effect at the next resize (scene.js resizes right after)
+  function setMSAA(n){if(sceneTarget.samples===n)return;for(const t of [composer.renderTarget1,composer.renderTarget2]){t.samples=n;t.dispose();}}
+  return {ready,resize,update,render,dispose,setMSAA,get progress(){return loaded?1:progressNow();},bundleAnchors(){return assembly.anchors(bridgeCamera,size.width,size.height);},get loaded(){return loaded;},get error(){return error;},tick(dt){elapsed+=Math.min(dt,.05);update(lastP,lastBg,entry);render();},diagnostics(){return {loaded,error:error?.message,state:{...S},camera:camera.position.toArray(),roomVisible:room.group.visible,roomSource:room.source,entryVisible:entryMeshes.some(o=>o.visible),cityMaterials:cityMaterials.length,kitTrees:kitTrees.map(o=>o.count),dayEnvironment:!!dayEnvTarget,assembly:assembly.diagnostics(),redPosition:bridgeWire.group.position.toArray()};}};
 }
 
 // Daylight sky gradient + sun, prefiltered once. Matches atmosphere.js day keys.

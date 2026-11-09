@@ -30,11 +30,24 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   // alpha-tested leaf cards plus AO, depth blur and bloom. At 1.75x on Retina it alternated 60/30 fps while
   // scrolling; 1.5x holds 60 and is still well above 1x (most of the frame sits in haze and depth blur).
   // The product wire canvas keeps 1.75x; type is HTML and unaffected.
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  // Render quality is set per stretch of the story (see watchFrame): the daylight city ("heavy": leaves, AO, depth
+  // blur) keeps the reduced ratio above; from the underground network to the cable close-up ("light": line work,
+  // the tower room, the bundle) the scene is cheap, and the reduced ratio with no anti-aliasing read as pixelated
+  // there, so it renders at (near) full resolution with 4x MSAA. Phones (2.6-3x screens) get one step more.
+  const PHONE = matchMedia("(pointer: coarse)").matches;
+  const QUALITY = {
+    heavy: { steps: PHONE ? [2, 1.75, 1.5] : [1.5, 1.25, 1], msaa: PHONE ? 4 : 0 },
+    light: { steps: PHONE ? [2.5, 2.25, 2] : [2, 1.75, 1.5], msaa: 4 },
+  };
+  const qualityStep = { heavy: 0, light: 0 };
+  let qualityMode = "heavy";
+  const qualityRatio = () => Math.min(window.devicePixelRatio || 1, QUALITY[qualityMode].steps[qualityStep[qualityMode]]);
+  renderer.setPixelRatio(qualityRatio());
   const wireRenderer = makeRenderer(wireCanvas);
   wireRenderer.toneMapping = THREE.NeutralToneMapping;
 
   const skyline = createSkyline(renderer);
+  skyline.setMSAA(QUALITY[qualityMode].msaa);
   let lastProgress = 0, lastBgColor = "#ffffff";
   const environmentTargets = [];
   function environmentFor(renderer) {
@@ -218,7 +231,9 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       out.anchors = {
         strands: project(wire.surfacePoint(wire.params.cutAt + 0.8, Math.PI / 2, 0.55)),
         jacket: project(wire.surfacePoint(wire.params.cutAt - 4.6, Math.PI * 0.62, 1.0)),
-        rating: project(wire.surfacePoint(jEnd - 12, Math.PI / 2, 1.0)),
+        // 12 back along the jacket; on narrow (phone) screens that falls off the left edge, so step it toward
+        // the cut until the pin is on screen (never closer than 6, where the jacket's own pin sits)
+        rating: (() => { let a; for (let d = 12; d >= 6; d -= 1) { a = project(wire.surfacePoint(jEnd - d, Math.PI / 2, 1.0)); if (a.x >= 28) break; } return a; })(),
       };
     }
     return out;
@@ -251,29 +266,37 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   }
   // Adaptive resolution for the city canvas. Its cost is fill rate (leaf overdraw, AO, depth blur, bloom),
   // which varies widely between GPUs. If frames keep missing the 60 fps budget (a third of the last
-  // 45 over 21 ms, i.e. under a second of stutter) the canvas steps down one resolution level: 1.5x -> 1.25x -> 1x. It never steps back up,
-  // so it cannot oscillate; one-off spikes (a shader compile, a texture upload) never reach the threshold.
-  const PR_STEPS = [1.5, 1.25, 1];
-  let prStep = 0, frames = 0, slowFrames = 0, pendingStep = false, stillFrames = 0, watchedProgress = -1;
+  // 45 over 21 ms, i.e. under a second of stutter) the current stretch steps down one level (QUALITY steps).
+  // A stretch never steps back up, so it cannot oscillate; one-off spikes (a shader compile, a texture upload)
+  // never reach the threshold. Heavy and light stretches keep separate steps: a slow daylight city no longer
+  // pulls the cheap network/room/cable close-ups down with it.
+  const lightAt = (p) => local(p, "extend") > 0 && local(p, "outro") === 0;
+  let frames = 0, slowFrames = 0, pendingStep = false, stillFrames = 0, watchedProgress = -1;
+  function applyQuality() {
+    renderer.setPixelRatio(qualityRatio());
+    skyline.setMSAA(QUALITY[qualityMode].msaa);
+    resize();
+    update(lastProgress, { bg: lastBgColor });   // resizing clears the canvas: redraw now, or that frame shows blank
+    if (local(lastProgress, "wireIn") < .5 || local(lastProgress, "outro") > 0) skyline.render();
+    frames = 0; slowFrames = 0;
+  }
   function watchFrame(dt) {
     if (!skyline.loaded || dt > 0.25) return;           // not running yet, or a stalled/background frame
-    // Reallocating the render targets takes a moment, so a decided step waits for the reader to pause:
+    // Reallocating the render targets takes a moment, so a change waits for the reader to pause:
     // a short hitch on a still frame is invisible, the same hitch mid-scroll reads as a jump.
     stillFrames = lastProgress === watchedProgress ? stillFrames + 1 : 0; watchedProgress = lastProgress;
-    if (pendingStep) {
+    const want = lightAt(lastProgress) ? "light" : "heavy";
+    if (want !== qualityMode || pendingStep) {
       if (stillFrames < 8) return;
-      pendingStep = false; prStep++;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PR_STEPS[prStep]));
-      resize();
-      update(lastProgress, { bg: lastBgColor });   // resizing clears the canvas: redraw now, or that frame shows blank
-      if (local(lastProgress, "wireIn") < .5 || local(lastProgress, "outro") > 0) skyline.render();
-      frames = 0; slowFrames = 0;
+      if (want !== qualityMode) { qualityMode = want; pendingStep = false; }   // a step decided in the other stretch does not carry over
+      else { pendingStep = false; qualityStep[qualityMode]++; }
+      applyQuality();
       return;
     }
     frames++; if (dt > 0.021) slowFrames++;
     if (frames < 45) return;
-    const next = PR_STEPS[prStep + 1];
-    if (slowFrames >= 15 && next && next < renderer.getPixelRatio()) pendingStep = true;
+    const next = QUALITY[qualityMode].steps[qualityStep[qualityMode] + 1];
+    if (slowFrames >= 15 && next && Math.min(window.devicePixelRatio || 1, next) < renderer.getPixelRatio()) pendingStep = true;
     frames = 0; slowFrames = 0;
   }
 
@@ -287,6 +310,6 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       skyline.tick(delta);
       watchFrame(delta);
     },
-    diagnostics: () => ({ pixelRatio: renderer.getPixelRatio(), skyline: skyline.diagnostics(), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, progress: lastProgress, finale: finaleStage?.diagnostics() }),
+    diagnostics: () => ({ pixelRatio: renderer.getPixelRatio(), quality: qualityMode, skyline: skyline.diagnostics(), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, progress: lastProgress, finale: finaleStage?.diagnostics() }),
   };
 }

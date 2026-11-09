@@ -50,13 +50,27 @@ function farRun() {
 }
 
 // Printed legend as on a real cable: small inkjet-style marking, repeated along the run.
-function jacketPrint() {
-  const canvas = document.createElement('canvas');canvas.width = 2048;canvas.height = 512;
-  const ctx = canvas.getContext('2d');ctx.fillStyle = '#ece9e3';ctx.fillRect(0, 0, 2048, 512);
-  ctx.fillStyle = 'rgba(70, 70, 66, 0.82)';ctx.font = '500 26px "DM Sans", Arial, sans-serif';
-  ctx.fillText('TAMIRA     3 CORE  1.5 SQ MM     HR-FR-LSH     1100 V', 80, 160);
-  const map = new THREE.CanvasTexture(canvas);map.colorSpace = THREE.SRGBColorSpace;
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;map.anisotropy = 8;
+// The sheath UVs address a 2048x512 layout, but the legend only occupies one strip of it (rows 96-224); the rest is
+// plain sheath. So only that strip is drawn, at up to 4x (same memory as the whole layout at 2x), and mapped back
+// with repeat/offset; T is clamped, so everywhere outside the strip shows the strip's plain edge rows. At the bundle
+// close-up the legend is magnified several times, and the old 1x/2x layout read as blurred.
+const PRINT_TOP = 96, PRINT_ROWS = 128;
+function jacketPrint(maxTexture = 4096) {
+  const k = Math.max(1, Math.min(4, Math.floor(maxTexture / 2048)));
+  const canvas = document.createElement('canvas');canvas.width = 2048 * k;canvas.height = PRINT_ROWS * k;
+  const ctx = canvas.getContext('2d');ctx.scale(k, k);ctx.translate(0, -PRINT_TOP);
+  const draw = () => {
+    ctx.fillStyle = '#ece9e3';ctx.fillRect(0, PRINT_TOP, 2048, PRINT_ROWS);
+    ctx.fillStyle = 'rgba(70, 70, 66, 0.82)';ctx.font = '500 26px "DM Sans", Arial, sans-serif';
+    ctx.fillText('TAMIRA     3 CORE  1.5 SQ MM     HR-FR-LSH     1100 V', 80, 160);
+  };
+  draw();
+  const map = new THREE.CanvasTexture(canvas);
+  // the site font may still be loading when this is built: redraw in it once it is in
+  document.fonts?.load('500 26px "DM Sans"').then(() => { draw();map.needsUpdate = true; }, () => {});map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.RepeatWrapping;map.wrapT = THREE.ClampToEdgeWrapping;map.anisotropy = 8;
+  // layout v (flipY) = 1 - row/512; the strip spans v 0.5625..0.8125 -> texture v 0..1
+  const s = 512 / PRINT_ROWS;map.repeat.set(1, s);map.offset.set(0, -(1 - (PRINT_TOP + PRINT_ROWS) / 512) * s);
   return map;
 }
 
@@ -132,10 +146,10 @@ function crossSection(mats) {
 
 /** White sheath/bedding with three independent cores. The supplied red Wire is
  * retained during extraction; no replacement red cable or full-screen cut. */
-export function createCableAssembly(redWire) {
+export function createCableAssembly(redWire, maxTexture) {
   const group = new THREE.Group();group.position.fromArray(ENTER);group.scale.setScalar(ASSEMBLY_SCALE);
   const sheath = new THREE.Group(),bedding = new THREE.Group();group.add(sheath,bedding);
-  const print = jacketPrint();
+  const print = jacketPrint(maxTexture);
   // PVC sheath: satin plastic with fine extrusion lines (normal map), not a flat matte tube
   const white = new THREE.MeshPhysicalMaterial({map: print,normalMap: extrusionNormal(),normalScale: new THREE.Vector2(.035, .035),
     roughness: .42,clearcoat: .5,clearcoatRoughness: .35,sheen: .25,sheenRoughness: .6,sheenColor: new THREE.Color('#ffffff'),side: THREE.DoubleSide});
