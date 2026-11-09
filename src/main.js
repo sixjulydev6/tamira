@@ -220,27 +220,46 @@ function runStory() {
   };
   gsap.ticker.add(animateTraffic);
 
-  // Phone layout for the three strand tags: equal rows under the chapter copy. Rows are assigned to pins by the
-  // shortest total leader length (tried over all 6 orders), which keeps the leaders from crossing each other.
+  // Phone layout for the three strand tags, in the bundle labels' pattern: tags in the clear space either side of
+  // the wire, each joined to its pin by a short leader. The wire runs lower-left to upper-right; the copper tag sits
+  // above it on the left, the jacket and rating tags side by side below it (user direction 2026-11-09). The wire's
+  // screen edges come from scene.js (anchors.wireEdges), so the tags clear it on any phone size; the rows also stay
+  // under the chapter copy and above the bottom of the screen.
   const STRAND_TAGS = ["strands", "jacket", "rating"];
   function stackStrandTags(anchors) {
-    if (!STRAND_TAGS.every((id) => anchors[id])) return null;
+    if (!STRAND_TAGS.every((id) => anchors[id]) || !anchors.wireEdges) return null;
+    const W = innerWidth, m = 20, gap = 12, clear = 14, tagOf = (id) => labelEls[id].querySelector(".label__tag");
+    // the two edge lines as y(x); the upper one on screen is the top edge
+    const lines = anchors.wireEdges.map(([p, q]) => (x) => p.y + (q.y - p.y) * (x - p.x) / ((q.x - p.x) || 1));
+    const [topY, botY] = lines[0](W / 2) < lines[1](W / 2) ? lines : [lines[1], lines[0]];
     const cr = chapterEls.find((c) => c.id === "strands")?.el.getBoundingClientRect();
-    const x = cr ? cr.left : 20, top0 = (cr ? cr.bottom : innerHeight * 0.4) + 14, ROW = 50, GAP = 6;
-    const size = Object.fromEntries(STRAND_TAGS.map((id) => { const t = labelEls[id].querySelector(".label__tag"); return [id, [t.offsetWidth, t.offsetHeight]]; }));
-    const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
-    let best = null, bestLen = Infinity;
-    for (const o of orders) {
-      let len = 0;
-      const out = {};
-      o.forEach((k, row) => {
-        const id = STRAND_TAGS[k], [w, h] = size[id], top = top0 + row * (ROW + GAP), ex = x + w, ey = top + h / 2, a = anchors[id];
-        len += Math.hypot(a.x - ex, a.y - ey);
-        out[id] = { x, top, d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} L ${ex.toFixed(1)} ${ey.toFixed(1)}` };
-      });
-      if (len < bestLen) { bestLen = len; best = out; }
-    }
-    return best;
+    const minTop = (cr ? cr.bottom : 0) + 12, maxBottom = innerHeight - 16;
+    const leader = (a, cx, y) => `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} L ${cx.toFixed(1)} ${y.toFixed(1)}`;
+    const out = {};
+    // above the wire: copper, on the left where the wire is lowest (on the right it covered the strands); its
+    // bottom clears the top edge across its width. Its leader runs up from the pin, then across to the tag's edge.
+    const a = anchors.strands, t = tagOf("strands"), w = Math.min(200, W * 0.52);
+    t.style.width = `${w}px`;
+    const h = t.offsetHeight, x = m;
+    // the edge lines are the jacket's sides, a little inside the wire's visible outline (the clear sleeve over the
+    // strands is wider), so the tag sits high: just under the copy, or lower only if the wire leaves room
+    const top = Math.min(maxBottom - h, Math.max(minTop, Math.min(minTop + 16, Math.min(topY(x), topY(x + w)) - clear - 40 - h)));
+    const ty = top + h / 2, ex = x + w;
+    out.strands = { x, top, d: a.x > ex + 8
+      ? `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} L ${a.x.toFixed(1)} ${ty.toFixed(1)} L ${ex.toFixed(1)} ${ty.toFixed(1)}`
+      : leader(a, Math.min(ex - 16, Math.max(x + 16, a.x)), top + h) };
+    // below the wire: jacket and rating side by side (pins on the red jacket, lower left), in the pins' left-to-right
+    // order; the row's top clears the bottom edge across its width
+    const w2 = Math.min(190, (W - 2 * m - gap) / 2);
+    const pair = ["jacket", "rating"].sort((p, q) => anchors[p].x - anchors[q].x);
+    pair.forEach((id) => { tagOf(id).style.width = `${w2}px`; });
+    const h2 = Math.max(...pair.map((id) => tagOf(id).offsetHeight));
+    const rowTop = Math.max(minTop, Math.min(maxBottom - h2, Math.max(botY(m), botY(m + 2 * w2 + gap)) + clear));
+    pair.forEach((id, i) => {
+      const x = m + i * (w2 + gap), a = anchors[id], cx = Math.min(x + w2 - 16, Math.max(x + 16, a.x));
+      out[id] = { x, top: rowTop, d: leader(a, cx, rowTop) };
+    });
+    return out;
   }
 
   function render(p) {
@@ -315,14 +334,13 @@ function runStory() {
         labelEls[id].classList.toggle('label--stacked',phone);
         if(phone){
           // Phones: the three strand tags overlapped each other's pins and leaders where the wire crosses the
-          // narrow screen. They sit in equal rows just under the chapter copy (left column), each joined to its
-          // pin by a drawn leader; see stackStrandTags for the row order.
+          // narrow screen; stackStrandTags places them either side of the wire with elbow leaders.
           const L=stacked?.[id];if(!L)continue;
           tag.style.translate=`${(L.x-(a.x+12)).toFixed(1)}px ${(L.top-(a.y-52-tag.offsetHeight)).toFixed(1)}px`;
           bundlePaths[id].setAttribute('d',L.d);
           continue;
         }
-        bundlePaths[id].setAttribute('d','');
+        bundlePaths[id].setAttribute('d','');tag.style.width='';
         const m=12,w=tag.offsetWidth,left=a.x+12;
         const dx=Math.min(0,innerWidth-m-(left+w))+Math.max(0,m-left);
         // and below the chapter copy (short phones): the tag's top sits 52px + its height above the pin
@@ -336,11 +354,19 @@ function runStory() {
         const margin=phone?32:60,gap=phone?16:24,cols=phone?2:4;
         const width=Math.min(phone?180:200,(innerWidth-2*margin-gap*(cols-1))/cols);
         const x=phone?margin+(index%2)*(width+gap):margin+index*(innerWidth-2*margin-width)/3;
-        const y=phone?innerHeight*(index<2?.78:.89):innerHeight*.86;
         const tag=labelEls[id].querySelector('.label__tag');
         tag.style.width=`${width}px`;
+        // Phones: sheath and bedding (pins on the cable's top surface) sit in a row above the cable, under the
+        // chapter copy; insulation and conductor in a row below it. Leaders run up or down to the nearer edge.
+        const top=phone&&index<2;
+        let y=phone?innerHeight*.84:innerHeight*.86;
+        if(top){
+          const h=tag.offsetHeight,cr=chapterEls.find(c=>c.id==='bundle')?.el.getBoundingClientRect();
+          const pinTop=Math.min(anchors.bundleSheath.y,anchors.bundleBedding.y);
+          y=Math.max(cr?cr.bottom+16:0,pinTop-48-h);
+          bundlePaths[id].setAttribute('d',`M ${a.x} ${a.y} L ${x+width/2} ${y+h+12} L ${x+width/2} ${y+h}`);
+        } else bundlePaths[id].setAttribute('d',`M ${a.x} ${a.y} L ${x+width/2} ${y-12} L ${x+width/2} ${y}`);
         tag.style.transform=`translate3d(${x-a.x}px,${y-a.y}px,0)`;
-        bundlePaths[id].setAttribute('d',`M ${a.x} ${a.y} L ${x+width/2} ${y-12} L ${x+width/2} ${y}`);
       }
     }
     bundleLeaders.style.visibility=(anchors?.bundleSheath||(anchors&&innerWidth<760))&&la>.001?'visible':'hidden';

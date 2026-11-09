@@ -233,6 +233,9 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
         jacket: project(wire.surfacePoint(wire.params.cutAt - 4.6, Math.PI * 0.62, 1.0)),
         // 12 back along the jacket; on narrow (phone) screens that falls off the left edge, so step it toward
         // the cut until the pin is on screen (never closer than 6, where the jacket's own pin sits)
+        // the jacket's two screen-edge lines (sides at 0 and pi), near the tail and past the cut: main.js keeps the
+        // phone label tags clear of the wire with these
+        wireEdges: [0, Math.PI].map((ang) => [jEnd - 14, wire.params.cutAt + 6].map((d) => project(wire.surfacePoint(d, ang, 1.0)))),
         rating: (() => { let a; for (let d = 12; d >= 6; d -= 1) { a = project(wire.surfacePoint(jEnd - d, Math.PI / 2, 1.0)); if (a.x >= 28) break; } return a; })(),
       };
     }

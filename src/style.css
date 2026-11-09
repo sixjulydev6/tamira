@@ -559,9 +559,12 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
 .label--bundle .label__v { font-size: 13px; line-height: 1.4; }
 /* phones: strand tags stacked in the corner under the wire, joined by drawn leaders (main.js) */
 .label--stacked .label__pin::after { display: none; }
-.label--stacked .label__tag { padding: 5px 9px 6px; gap: 1px; }
-.label--stacked .label__k { font-size: 0.75rem; }
-.label--stacked .label__v { font-size: 0.875rem; }
+.label--stacked .label__tag {     /* dark cards like the bundle labels: legible over copper, the red jacket and the light page */
+  padding: 8px 10px 9px; gap: 2px; white-space: normal;
+  background: rgba(20, 14, 12, 0.92);
+}
+.label--stacked .label__k { font-size: 0.75rem; color: rgba(243, 241, 238, 0.6); }
+.label--stacked .label__v { font-size: 0.875rem; color: #f3f1ee; }
 
 /* temperature gauge (heat chapter) */
 .gauge {
