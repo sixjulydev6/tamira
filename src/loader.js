@@ -74,7 +74,7 @@ export function createLoader(el) {
     const ticked = etaSec == null ? raw : Math.max(0, etaSec - ETA_EVERY_MS / 1000);
     etaSec = ticked + (raw - ticked) * 0.25;
     const s = Math.ceil(etaSec);
-    setEta(s <= 2 ? "Almost there" : `About ${s} seconds left`);
+    setEta(s <= 2 ? "" : `About ${s} seconds left`);   // hidden for the last 2 seconds
   };
 
   const draw = (p) => {
