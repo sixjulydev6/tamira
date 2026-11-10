@@ -10,7 +10,7 @@
 | Brand font | Geist Serif headings and Instrument Sans body/UI; actual SVG logo is in place | Client font approval or licensed replacement |
 | Favicon | `public/favicon.svg` | The real icon |
 | Nav links | `#consumers`, `#industries`, `#investors`, `#company` | The real pages or sections |
-| End / Contact section | `.end` in `index.html` | Real copy, and a real address (currently `mailto:hello@tamira.example`) |
+| End / Contact section | `.end` in `index.html` | Real copy (the button links to https://sixjuly.com/contact/, user direction 2026-11-10) |
 | Finale | Red product wire + black + green → original switchboard rear → living room | Implemented with original camera/red insertion timing and room assets; rear visibility fix needs final Comet review; see `ROOM-FINALE.md`. |
 | Props | Procedural conduit, heater, flame, smoke, switch plate | Optional Blender GLBs for higher fidelity |
 | Hero sentence | `.hero__lede` in `index.html` | Client sign-off on "Tamira makes copper house wire for homes and buildings: safe, flexible, and built to last." |
