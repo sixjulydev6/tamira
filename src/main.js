@@ -330,9 +330,9 @@ function runStory() {
       // strand labels: slide the tag back inside the screen when the pin sits near an edge (phones); the pin
       // and its leader stay on the wire. Measured from the tag's own size, so it holds for any copy length.
       if(!id.startsWith('bundle')){
-        const tag=labelEls[id].querySelector('.label__tag'),phone=innerWidth<760;
-        labelEls[id].classList.toggle('label--stacked',phone);
-        if(phone){
+        const tag=labelEls[id].querySelector('.label__tag'),L0=stacked?.[id];
+        labelEls[id].classList.toggle('label--stacked',!!L0);if(L0)labelEls[id].classList.remove('label--flag','label--flip');
+        if(L0){
           // Phones: the three strand tags overlapped each other's pins and leaders where the wire crosses the
           // narrow screen; stackStrandTags places them either side of the wire with elbow leaders.
           const L=stacked?.[id];if(!L)continue;
@@ -340,14 +340,20 @@ function runStory() {
           bundlePaths[id].setAttribute('d',L.d);
           continue;
         }
+        // Desktop: a flag on a pole. The leader rises straight from the pin and the tag's pole-side edge sits
+        // exactly on it, so line and card always meet. Near the right edge the flag flips to hang left of the pole.
         bundlePaths[id].setAttribute('d','');tag.style.width='';
-        const m=12,w=tag.offsetWidth,left=a.x+12;
-        const dx=Math.min(0,innerWidth-m-(left+w))+Math.max(0,m-left);
-        // and below the chapter copy (short phones): the tag's top sits 52px + its height above the pin
+        const el=labelEls[id];el.classList.add('label--flag');
+        const m=16,w=tag.offsetWidth,flip=a.x+w+m>innerWidth&&a.x-w>=m;
+        el.classList.toggle('label--flip',flip);
+        const left=flip?a.x-w:a.x;
+        const dx=Math.min(0,innerWidth-m-(left+w))+Math.max(0,m-left);   // only if neither side fits
+        // and below the chapter copy: the tag's top sits 52px + its height above the pin; the pole stretches
         const cr=chapterEls.find(c=>c.id==='strands')?.el.getBoundingClientRect(),tl=left+dx;
         const under=cr&&tl<cr.right&&tl+w>cr.left;   // only when the tag sits under the copy's column
-        const dy=under?Math.max(0,cr.bottom+8-(a.y-52-tag.offsetHeight)):0;
+        const dy=under?Math.max(0,cr.bottom+12-(a.y-52-tag.offsetHeight)):0;
         tag.style.translate=dx||dy?`${dx.toFixed(1)}px ${dy.toFixed(1)}px`:'';
+        el.style.setProperty('--pole',`${Math.max(12,48-dy).toFixed(1)}px`);
       }
       if(id.startsWith('bundle')) {
         const index=Object.keys(bundlePaths).indexOf(id),phone=innerWidth<760;
@@ -369,7 +375,7 @@ function runStory() {
         tag.style.transform=`translate3d(${x-a.x}px,${y-a.y}px,0)`;
       }
     }
-    bundleLeaders.style.visibility=(anchors?.bundleSheath||(anchors&&innerWidth<760))&&la>.001?'visible':'hidden';
+    bundleLeaders.style.visibility=(anchors?.bundleSheath||stacked)&&la>.001?'visible':'hidden';
 
     // temperature gauge
     const h = local(p, "heat");

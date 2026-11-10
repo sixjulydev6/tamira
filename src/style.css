@@ -555,8 +555,34 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
 .bundle-leaders { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .bundle-leaders path { fill: none; stroke: var(--ink); stroke-opacity: .45; stroke-width: 1; }
 .label--bundle .label__pin::after { display: none; }
-.label--bundle .label__tag { left: 0; top: 0; bottom: auto; white-space: normal; padding: 8px 10px; }
-.label--bundle .label__v { font-size: 13px; line-height: 1.4; }
+/* desktop strand labels: flag on a pole. The leader (pin -> tag bottom) and the tag's pole-side edge share x = 0,
+   so the line always lands on the card. --pole is set from main.js when the tag is pushed down under the copy. */
+.label--flag .label__pin {
+  left: -4.5px; top: -4.5px; width: 9px; height: 9px;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--bg), transparent 15%), 0 1px 6px rgba(0, 0, 0, .25);
+}
+.label--flag .label__pin::after {
+  left: 4px; bottom: 9px;
+  height: var(--pole, 48px);
+  background: color-mix(in oklab, var(--ink), transparent 35%);
+}
+.label--flag .label__tag {
+  left: -0.5px; bottom: 52px;
+  gap: 3px;
+  min-width: 168px;
+  padding: 10px 14px 11px;
+  border-left: 1px solid color-mix(in oklab, var(--ink), transparent 35%);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 14, 12, .06), 0 8px 24px -10px rgba(20, 14, 12, .22);
+}
+.label--flip .label__tag {
+  left: auto; right: -0.5px;
+  border-left: 0; border-right: 1px solid color-mix(in oklab, var(--ink), transparent 35%);
+  border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+}
+.label--flag .label__k { font-size: 0.875rem; color: color-mix(in oklab, var(--ink), transparent 50%); }
+.label--flag .label__v { font-size: var(--text-body-15); color: var(--ink); line-height: 1.35; }
 /* phones: strand tags stacked in the corner under the wire, joined by drawn leaders (main.js) */
 .label--stacked .label__pin::after { display: none; }
 .label--stacked .label__tag {     /* dark cards like the bundle labels: legible over copper, the red jacket and the light page */
@@ -565,6 +591,7 @@ html.is-loading .primary-nav { opacity: 0; visibility: hidden; }
 }
 .label--stacked .label__k { font-size: 0.75rem; color: rgba(243, 241, 238, 0.6); }
 .label--stacked .label__v { font-size: 0.875rem; color: #f3f1ee; }
+
 
 /* temperature gauge (heat chapter) */
 .gauge {

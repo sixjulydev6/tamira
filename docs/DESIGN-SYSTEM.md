@@ -111,3 +111,7 @@ Each size runs linearly from a 480px to a 1280px viewport, then holds.
 ## Finale motion constraint
 
 Keep the red cable continuously visible from smoke into the L terminal; black (`#161719`) and green (`#1a6633`) follow into N and E on the source timing (DECISIONS 29). Use the original three-wire camera choreography, with only the short smoke-camera bridge adapted. No extra tip-follow sweep or canvas fade. Preserve the later original room pullback, five lighting states and dark close. Comet visual approval of rear visibility is still pending after the visibility fix. See [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md).
+
+### Strand labels, desktop (2026-11-10)
+
+Each strand-chapter label is a flag on a pole: a 1px leader rises straight from the pin, and the tag's left edge (its 1px border) sits exactly on that line, so the line always lands on the card. The tag is a white card (2px corners, soft shadow) with a grey sentence-case key over the ink value, matching the bundle labels' card layout (2026-11-10 user direction: same positions as before, not one row, white background). Near the right edge the flag flips to hang left of the pole (`label--flip`). When the tag is pushed down below the chapter copy, `--pole` shortens the leader to match. Phones keep the stacked dark cards (`label--stacked`).
