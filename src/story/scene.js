@@ -178,7 +178,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       // end stays on screen (it ran off the right edge on an iPad mini). Phones keep the close shot: pulled
       // back there, the copper rose into the chapter copy.
       strands: portrait && W >= 600
-        ? [cutPos.clone().add(new THREE.Vector3(halfW * 0.42, -halfH * 0.04, d0 * 0.68)), cutPos.clone().add(new THREE.Vector3(halfW * 0.42, halfH * 0.08, 0))]
+        ? [cutPos.clone().add(new THREE.Vector3(halfW * 0.12, -halfH * 0.06, d0 * 0.95)), cutPos.clone().add(new THREE.Vector3(halfW * 0.12, halfH * 0.06, 0))]
         : [cutPos.clone().add(new THREE.Vector3(-halfW * 0.05, -halfH * 0.05, d0 * 0.46)), cutPos.clone().add(new THREE.Vector3(-halfW * 0.22, halfH * 0.1, 0))],
       flame: [cp.clone().add(new THREE.Vector3(-halfW * 0.25, halfH * 0.05, d0 * 0.62)), cp.clone().add(new THREE.Vector3(-halfW * 0.32, halfH * 0.22, 0))],
     };
