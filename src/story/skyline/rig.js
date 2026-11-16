@@ -55,6 +55,10 @@ const CLIMB_TGT = [[RX, 22, RZ], [RX, 86, RZ], ROOM_VIEW.tgt]
 
 // 05: into the room through its open corner, along the ceiling, under the wire to its far side
 const CLOSE = 0.34 // final distance from the wire's axis: it fills most of the frame
+// tall screens end the push a little further back: at 0.34 the cable overfilled a portrait iPad and the
+// legend ran off the side (iPad mini review). The bundle shot starts from the same distance, so no seam.
+const CLOSE_PORTRAIT = 0.46
+const closeFor = (portrait) => (portrait ? CLOSE_PORTRAIT : CLOSE)
 const FOLLOW_POS = [
   ROOM_VIEW.pos, [94.6, yc - 1.1, 46.4], [88.6, yc - 0.85, 40.6],
   [88.4, yc - 0.85, 37.7], [85.95, yc - 0.42, 36.5], [ENTER[0] - CLOSE, ENTER[1] - 0.02, ENTER[2]]
@@ -73,7 +77,10 @@ const FINAL_POS = FOLLOW_POS[FOLLOW_POS.length - 1], FINAL_TGT = FOLLOW_TGT[FOLL
 // the turn ends 1.3 m back on the close-up's own line of sight, so the push in is a straight dolly
 const DOLLY_END = FINAL_POS.clone().addScaledVector(FINAL_TGT.clone().sub(FINAL_POS).normalize(), -1.3)
 // follow-progress windows; neighbours overlap a little so the move never stops dead
-const STRAIGHT = [0, 0.5], TURN = [0.42, 0.82], PUSH = [0.72, 1]
+// The push starts a little earlier (was 0.72) and moves in even steps of apparent size (distance is
+// interpolated on a log scale): a plain lerp of distance grew the cable ~5x in the last tenth of the scroll,
+// which read as a jump into the close-up, worst on portrait screens.
+const STRAIGHT = [0, 0.5], TURN = [0.42, 0.82], PUSH = [0.62, 1]
 
 function spherical(k, out) {
   const a = k.az * D2R, e = k.el * D2R
@@ -83,7 +90,7 @@ function spherical(k, out) {
 export function createRig(camera, size) {
   const tmp = buildOnce(() => ({
     key: { t: [0, 0, 0], az: 0, el: 0, d: 0, fov: 30, ox: 0 },
-    pos: new THREE.Vector3(), tgt: new THREE.Vector3(), p2: new THREE.Vector3(), t2: new THREE.Vector3(),
+    pos: new THREE.Vector3(), tgt: new THREE.Vector3(), p2: new THREE.Vector3(), p3: new THREE.Vector3(), t2: new THREE.Vector3(),
     sPos: new THREE.Vector3(), sTgt: new THREE.Vector3(),
     d0: new THREE.Vector3(), d1: new THREE.Vector3(), d2: new THREE.Vector3(), d3: new THREE.Vector3(), q: new THREE.Quaternion(), qi: new THREE.Quaternion(), first: true, fov: 30, ox: 0, oy: 0,
     climb: null, climbPortrait: null
@@ -163,12 +170,15 @@ export function createRig(camera, size) {
       if (portrait) start.sub(FOLLOW_TGT[0]).multiplyScalar(2.1).add(FOLLOW_TGT[0])
       const d0 = tmp.d0.copy(FOLLOW_TGT[0]).sub(start).normalize()
       const travel = tmp.d1.copy(DOLLY_END).sub(start).normalize()
-      const dEnd = tmp.d2.copy(FINAL_TGT).sub(FINAL_POS)
+      const finalPos = tmp.p3.copy(FINAL_POS).sub(FINAL_TGT).multiplyScalar(closeFor(portrait) / CLOSE).add(FINAL_TGT)
+      const dEnd = tmp.d2.copy(FINAL_TGT).sub(finalPos)
       const endDist = dEnd.length(); dEnd.normalize()
       const win = ([x0, x1]) => eio(THREE.MathUtils.clamp((f - x0) / (x1 - x0), 0, 1))
       const a = win(STRAIGHT), b = win(TURN), c = win(PUSH)
       // position: straight line in, (hold while turning), straight push to the close-up
-      tmp.pos.copy(start).lerp(DOLLY_END, a).lerp(FINAL_POS, c)
+      const pushFrom = DOLLY_END.distanceTo(FINAL_TGT)
+      const pushDist = Math.exp(lerp(Math.log(pushFrom), Math.log(endDist), c))
+      tmp.pos.copy(start).lerp(DOLLY_END, a).lerp(finalPos, (pushFrom - pushDist) / (pushFrom - endDist))
       // heading: settle onto the line of travel, then turn onto the wire
       const dir = tmp.d3.copy(d0).lerp(travel, smooth(f, 0, STRAIGHT[1] * 0.6)).normalize()
       tmp.q.setFromUnitVectors(travel, dEnd)
@@ -194,7 +204,7 @@ export function createRig(camera, size) {
       // as the cut opens the camera already eases a little toward the near piece's cut face (same end pose)
       const opening = (S.part || 0) * (S.part || 0) * (3 - 2 * (S.part || 0))
       const phi = lerp(180 - 16 * opening, 128, x) * D2R, el = lerp(4 * opening, 16, x) * D2R
-      const dist = lerp(CLOSE, portrait ? 1.6 : 1.2, smooth(S.explode, 0, 1))
+      const dist = lerp(closeFor(portrait), portrait ? 1.6 : 1.2, smooth(S.explode, 0, 1))
       tmp.t2.set(ENTER[0], ENTER[1], ENTER[2] - 0.2 * x)
       tmp.p2.set(Math.cos(phi) * Math.cos(el), Math.sin(el), Math.sin(phi) * Math.cos(el)).multiplyScalar(dist).add(tmp.t2)
       tmp.p2.x += look.sx * 0.04 * x; tmp.p2.y += look.sy * 0.03 * x
