@@ -177,7 +177,10 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       strands: [cutPos.clone().add(new THREE.Vector3(-halfW * 0.05, -halfH * 0.05, d0 * 0.46)), cutPos.clone().add(new THREE.Vector3(-halfW * 0.22, halfH * 0.1, 0))],
       flame: [cp.clone().add(new THREE.Vector3(-halfW * 0.25, halfH * 0.05, d0 * 0.62)), cp.clone().add(new THREE.Vector3(-halfW * 0.32, halfH * 0.22, 0))],
     };
-    poses.smoke = [poses.flame[0].clone().add(new THREE.Vector3(0, halfH * 0.3, d0 * 0.2)), poses.flame[1].clone().add(new THREE.Vector3(0, halfH * 0.35, 0))];
+    // the smoke shot tilts up to the rising wisp; on tall screens a lift scaled by the full screen height
+    // pushed the wire to the bottom edge (iPad mini review), so the lift is capped at a landscape-sized height
+    const lift = Math.min(halfH, halfW * 0.75);
+    poses.smoke = [poses.flame[0].clone().add(new THREE.Vector3(0, lift * 0.3, d0 * 0.2)), poses.flame[1].clone().add(new THREE.Vector3(0, lift * 0.35, 0))];
     // sequential blends: each chapter eases the camera from wherever the last one left it
     const camPos = base.clone(), camLook = look.clone();
     const blendTo = ([cp2, lk], t) => { camPos.lerp(cp2, t); camLook.lerp(lk, t); };

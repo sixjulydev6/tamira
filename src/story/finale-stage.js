@@ -52,16 +52,18 @@ export function createFinaleStage(renderer, scene, wire) {
   for(const e of extras)poseExtra(e,1);
   renderer.compile(scene,camera);
   for(const e of extras)e.wire.group.visible=false;
-  let blend=0;
+  let blend=0;const wirePts=[];
   function poseWire(u,startPoints){
     blend=beat(u,6.06,6.32);
     const scale=lerp(1,SCALE,blend),seat=1-Math.pow(1-beat(u,6.38,6.5),3);
     const tip=length-(1-seat)*26,tail=tip-30;
     const start=new THREE.CatmullRomCurve3(startPoints,false,'centripetal');
     wire.group.scale.setScalar(scale);wire.group.visible=true;
+    wirePts.length=0;
     wire.setPath(Array.from({length:55},(_,i)=>{
-      const t=i/54;
-      return start.getPointAt(t).lerp(curve.getPointAt(THREE.MathUtils.clamp(lerp(tail,tip,t)/length,0,1)),blend).divideScalar(scale);
+      const t=i/54,w=start.getPointAt(t).lerp(curve.getPointAt(THREE.MathUtils.clamp(lerp(tail,tip,t)/length,0,1)),blend);
+      wirePts.push(w);
+      return w.clone().divideScalar(scale);
     }));
     Object.assign(wire.params,{head:1,strip:lerp(3.4,FINALE.copper,blend)/scale,fan:lerp(.65,0,blend),glow:0,char:1-blend,cut:0,heat:0});
     wire.update();
@@ -89,6 +91,24 @@ export function createFinaleStage(renderer, scene, wire) {
     camera.projectionMatrix.makePerspective(L*near,(L+w)*near,topEdge*near,(topEdge-hh)*near,near,far);
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   }
+  // During the smoke-to-board bridge the wire travels to the wall while the camera travels to its first
+  // board shot, and for about a screen of scroll the wire was off the frame (worst on tall screens).
+  // Turn the camera (rotation only, no extra travel) just far enough to keep the wire's leading stretch
+  // inside the frame; k fades it in after the smoke shot and out before the original path takes over.
+  const qFrom=new THREE.Quaternion(),qTo=new THREE.Quaternion(),lookM=new THREE.Matrix4(),probe=new THREE.Vector3();
+  const LEAD=46,EDGE=.6;
+  function keepWireInView(k){
+    if(k<=0||wirePts.length<=LEAD)return;
+    camera.updateMatrixWorld();
+    const target=wirePts[LEAD];
+    const inside=q=>{camera.quaternion.copy(q);camera.updateMatrixWorld();probe.copy(target).project(camera);return probe.z<1&&Math.abs(probe.x)<=EDGE&&Math.abs(probe.y)<=EDGE;};
+    qFrom.copy(camera.quaternion);
+    if(inside(qFrom))return;
+    lookM.lookAt(camera.position,target,camera.up);qTo.setFromRotationMatrix(lookM);
+    let lo=0,hi=1;
+    for(let i=0;i<10;i++){const m=(lo+hi)/2;if(inside(qFrom.clone().slerp(qTo,m)))hi=m;else lo=m;}
+    camera.quaternion.copy(qFrom).slerp(qTo,hi*k);camera.updateMatrixWorld();
+  }
   let lastSize = { width: 1, height: 1 };
   function update(u,width,height,startCamera,startPoints){
     lastSize = { width, height };
@@ -107,9 +127,10 @@ export function createFinaleStage(renderer, scene, wire) {
     camera.fov=lerp(startCamera.fov,camera.fov,move);
     camera.setViewOffset(width,height,0,-height*(.06+.02*portrait)*move,width,height);
     camera.updateProjectionMatrix();
+    poseWire(u,startPoints);
+    keepWireInView(beat(u,6.07,6.13)*(1-beat(u,6.24,6.32)));
     handoff(beat(u,6.9,6.985),aspect);
     set.update({fade:1,clicks:{red:beat(u,6.5,6.53),black:beat(u,...extras[0].click),green:beat(u,...extras[1].click)}},camera);
-    poseWire(u,startPoints);
     for(const e of extras)poseExtra(e,1-Math.pow(1-beat(u,...e.seat),3));
     return {scene,camera};
   }
@@ -120,6 +141,6 @@ export function createFinaleStage(renderer, scene, wire) {
     const g=ROOM_VIEW[frameFor(width/height)],win=windowAt(g,0,width/height);
     const actual=[(point.x*.5+.5)*width,(-point.y*.5+.5)*height];
     const expected=[(g.board.centre[0]-win.x0)/win.w*width,(g.board.centre[1]-win.y0)/win.h*height];
-    return {boardVisible:set.group.visible,connectionWires:1+extras.filter(e=>e.wire.group.visible).length,wireId:wire.group.uuid,blend,boardActual:actual,boardExpected:expected,boardErrorPx:Math.hypot(actual[0]-expected[0],actual[1]-expected[1])};
+    return {wireOnScreen:wirePts.filter(v=>{const q=v.clone().project(camera);return Math.abs(q.x)<1&&Math.abs(q.y)<1&&q.z<1;}).length/wirePts.length,boardVisible:set.group.visible,connectionWires:1+extras.filter(e=>e.wire.group.visible).length,wireId:wire.group.uuid,blend,boardActual:actual,boardExpected:expected,boardErrorPx:Math.hypot(actual[0]-expected[0],actual[1]-expected[1])};
   }};
 }

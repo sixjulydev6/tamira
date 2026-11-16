@@ -66,3 +66,7 @@ The room painter is prepared near smoke. It uses the original `aspect <= 0.8` po
 - Do not describe this as a visually verified exact match. Real-device performance and product/contact placeholders remain open.
 
 Latest handoff: [CURRENT-CONTEXT.md](CURRENT-CONTEXT.md). Next review in Comet: smoke → rear reveal → red seating → front arc → room, then reverse and portrait.
+
+## 2026-11-16: iPad mini fixes
+
+Room images retry failed fetches, decode the opening frames ahead from the smoke chapter on (`RoomPainter.prime`), and touch devices keep at most 10 decoded images. The smoke-to-board bridge keeps the wire in frame by rotating the camera only (`keepWireInView`). See CLAUDE.md.

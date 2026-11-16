@@ -37,6 +37,13 @@ Lighting/post (`TUNE` in `skyline/index.js`, `atmosphere.js`) is tuned separatel
 - Camera hero → network is ONE eased move (`S.cam` = cosine ease of rise+scan+net in key space) and `rig.js` passes through the key shots on monotone cubic curves (no overshoot). Per-move easing used to stop the camera at every key: 38% of that scroll moved at <10% of average speed.
 - Perf scripts used: wheel-driven frame timing per segment, first vs second pass. GPU contention on this machine made single runs noisy; compare interleaved runs.
 
+## iPad mini ending fixes (2026-11-16, review feedback)
+
+- Smoke shot: the camera's lift toward the wisp is capped at a landscape-sized height (`poses.smoke` in `scene.js`); scaled by the full portrait height it pinned the wire to the bottom edge on tall screens.
+- Smoke-to-board bridge (u 6.06-6.32, the only adapted part of the finale camera): `keepWireInView` in `finale-stage.js` turns the camera (rotation only, no extra travel, not a tip-follow) just enough to keep the wire's leading stretch inside the frame, fading in 6.07-6.13 and out 6.24-6.32. Before, the wire was off screen for about one screen of scroll on every device. `diagnostics().finale.wireOnScreen` reports the visible share.
+- Room images (`roompaint.js`, `room.js`): failed fetches retry (4 tries); the opening frames are decoded ahead from the smoke chapter on (`prime`), so a quick swipe no longer reaches the room before anything is decoded (it showed nothing, then the outro city); touch devices hold at most 10 decoded images (each 7-11 MB) to stay inside tablet Safari's memory.
+- Checked in headless Chrome at 744x1133 / 390x844 / 1440x900 with throttled CPU; not yet on a real iPad.
+
 ## Historical direction to preserve after the product handover
 
 - Live clay city/camera rise and traffic in Three.js, warm orange wireframe, avenue power-up, continuous city-to-product handover.

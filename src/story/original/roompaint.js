@@ -14,6 +14,9 @@ const BEHIND = 0.04, AHEAD = 0.16;
 const KEEP = [0.36, 0.48];
 // The width of the soft edges baked into the closer levels, as a share of their size
 const EDGE = 0.07;
+// Touch devices (phones, iPads) hold fewer decoded images at once: each is 7-11 MB, and alongside the 3D
+// canvases a tablet's Safari silently fails decodes when memory runs short, which left the room blank.
+const MAX_DECODED = matchMedia('(pointer: coarse)').matches ? 10 : 64;
 
 export class RoomPainter {
   // g: the frame's geometry (ROOM_VIEW.d or .p). url(name, step): an image's address.
@@ -34,16 +37,28 @@ export class RoomPainter {
     this.stats = { paints: 0, standIns: 0, held: 0 };
   }
 
-  // Fetch every frame's file now; decoding waits until each is about to be needed
+  // Fetch every frame's file now; decoding waits until each is about to be needed. A failed fetch (a
+  // dropped mobile connection) is retried: without its widest level the room can never be painted.
   load() {
     const jobs = [];
+    const get = (url, tries) => fetch(url).then((r) => { if (!r.ok) throw new Error(`Room asset ${r.status}`); return r.blob(); })
+      .catch((err) => { if (!this.alive || tries <= 1) throw err; return new Promise((ok) => setTimeout(ok, 800)).then(() => get(url, tries - 1)); });
     this.g.levels.forEach((lv) => {
       for (let s = 0; s <= this.beats.steps.length; s++) {
         const key = `${lv.name}-${s}`;
-        jobs.push(fetch(this.url(lv.name, s)).then((r) => { if (!r.ok) throw new Error(`Room asset ${r.status}`); return r.blob(); }).then((b) => { if (this.alive) { this.blobs.set(key, b); this.pump(); } }).catch(() => {}));
+        jobs.push(get(this.url(lv.name, s), 4).then((b) => { if (this.alive) { this.blobs.set(key, b); this.pump(); } }).catch(() => {}));
       }
     });
     return Promise.all(jobs);
+  }
+
+  // Before the room is on screen: decode what its first frames need, so it is there the moment it fades in
+  // (a quick swipe used to reach the room before anything was decoded, and it showed nothing)
+  prime(u) {
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    if (!w || !h || this.painted) return;
+    this.last = { u, w, h };
+    this.pump();
   }
 
   // What's drawn at u on a w x h screen: levels widest first, each with its finished step and the one
@@ -88,8 +103,13 @@ export class RoomPainter {
     const order = [...new Set(want)].sort((a, b) => Math.abs(this.near(a) - u) - Math.abs(this.near(b) - u));
     const now = performance.now();
     order.forEach((key) => this.lastSeen.set(key, now));
+    const wanted = new Set(order);
+    // Let go of what's well behind first, and when over the cap, of whatever this stretch doesn't need
+    for (const [key, bmp] of this.bmps) {
+      if (now - (this.lastSeen.get(key) || 0) > 1500 || (this.bmps.size > MAX_DECODED && !wanted.has(key))) { bmp.close(); this.bmps.delete(key); }
+    }
     for (const key of order) {
-      if (this.pending.size >= 2) break;
+      if (this.pending.size >= 2 || this.bmps.size + this.pending.size >= MAX_DECODED) break;
       if (this.bmps.has(key) || this.pending.has(key) || !this.blobs.has(key)) continue;
       this.pending.add(key);
       createImageBitmap(this.blobs.get(key)).then((bmp) => {
@@ -99,9 +119,6 @@ export class RoomPainter {
         this.dirty = true;
         this.pump();
       }).catch(() => { this.pending.delete(key); });
-    }
-    for (const [key, bmp] of this.bmps) {
-      if (now - (this.lastSeen.get(key) || 0) > 1500) { bmp.close(); this.bmps.delete(key); }
     }
   }
 

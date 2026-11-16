@@ -19,6 +19,7 @@ export function createRoom(element) {
       current.load().then(()=>{if(alive&&painter===current)loading=false;});
     }
     if(painter&&u>6.85)painter.paint(u);
+    else if(painter)painter.prime(6.99);   // decode the opening frames ahead, from the smoke chapter on
     // Do not cover the matched live board with a blank canvas while images are decoding.
     const opacity=painter?.painted?smooth(6.99,7.06,u):0;
     element.style.opacity=String(opacity*(1-smooth(0,.07,local(p,'outro'))));
