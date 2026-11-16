@@ -91,24 +91,6 @@ export function createFinaleStage(renderer, scene, wire) {
     camera.projectionMatrix.makePerspective(L*near,(L+w)*near,topEdge*near,(topEdge-hh)*near,near,far);
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   }
-  // During the smoke-to-board bridge the wire travels to the wall while the camera travels to its first
-  // board shot, and for about a screen of scroll the wire was off the frame (worst on tall screens).
-  // Turn the camera (rotation only, no extra travel) just far enough to keep the wire's leading stretch
-  // inside the frame; k fades it in after the smoke shot and out before the original path takes over.
-  const qFrom=new THREE.Quaternion(),qTo=new THREE.Quaternion(),lookM=new THREE.Matrix4(),probe=new THREE.Vector3();
-  const LEAD=46,EDGE=.6;
-  function keepWireInView(k){
-    if(k<=0||wirePts.length<=LEAD)return;
-    camera.updateMatrixWorld();
-    const target=wirePts[LEAD];
-    const inside=q=>{camera.quaternion.copy(q);camera.updateMatrixWorld();probe.copy(target).project(camera);return probe.z<1&&Math.abs(probe.x)<=EDGE&&Math.abs(probe.y)<=EDGE;};
-    qFrom.copy(camera.quaternion);
-    if(inside(qFrom))return;
-    lookM.lookAt(camera.position,target,camera.up);qTo.setFromRotationMatrix(lookM);
-    let lo=0,hi=1;
-    for(let i=0;i<10;i++){const m=(lo+hi)/2;if(inside(qFrom.clone().slerp(qTo,m)))hi=m;else lo=m;}
-    camera.quaternion.copy(qFrom).slerp(qTo,hi*k);camera.updateMatrixWorld();
-  }
   let lastSize = { width: 1, height: 1 };
   function update(u,width,height,startCamera,startPoints){
     lastSize = { width, height };
@@ -128,8 +110,6 @@ export function createFinaleStage(renderer, scene, wire) {
     camera.setViewOffset(width,height,0,-height*(.06+.02*portrait)*move,width,height);
     camera.updateProjectionMatrix();
     poseWire(u,startPoints);
-    // portrait only (desktop review: on wide screens it changed the board shot; there the original framing stays)
-    keepWireInView(portrait*beat(u,6.07,6.13)*(1-beat(u,6.24,6.32)));
     handoff(beat(u,6.9,6.985),aspect);
     set.update({fade:1,clicks:{red:beat(u,6.5,6.53),black:beat(u,...extras[0].click),green:beat(u,...extras[1].click)}},camera);
     for(const e of extras)poseExtra(e,1-Math.pow(1-beat(u,...e.seat),3));
