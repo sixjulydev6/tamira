@@ -55,9 +55,9 @@ const CLIMB_TGT = [[RX, 22, RZ], [RX, 86, RZ], ROOM_VIEW.tgt]
 
 // 05: into the room through its open corner, along the ceiling, under the wire to its far side
 const CLOSE = 0.34 // final distance from the wire's axis: it fills most of the frame
-// tall screens end the push a little further back: at 0.34 the cable overfilled a portrait iPad and the
+// tall screens end the push further back: at 0.34 (and 0.46) the cable overfilled a portrait iPad and the
 // legend ran off the side (iPad mini review). The bundle shot starts from the same distance, so no seam.
-const CLOSE_PORTRAIT = 0.46
+const CLOSE_PORTRAIT = 0.8
 const closeFor = (portrait) => (portrait ? CLOSE_PORTRAIT : CLOSE)
 const FOLLOW_POS = [
   ROOM_VIEW.pos, [94.6, yc - 1.1, 46.4], [88.6, yc - 0.85, 40.6],
