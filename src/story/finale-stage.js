@@ -128,7 +128,8 @@ export function createFinaleStage(renderer, scene, wire) {
     camera.setViewOffset(width,height,0,-height*(.06+.02*portrait)*move,width,height);
     camera.updateProjectionMatrix();
     poseWire(u,startPoints);
-    keepWireInView(beat(u,6.07,6.13)*(1-beat(u,6.24,6.32)));
+    // portrait only (desktop review: on wide screens it changed the board shot; there the original framing stays)
+    keepWireInView(portrait*beat(u,6.07,6.13)*(1-beat(u,6.24,6.32)));
     handoff(beat(u,6.9,6.985),aspect);
     set.update({fade:1,clicks:{red:beat(u,6.5,6.53),black:beat(u,...extras[0].click),green:beat(u,...extras[1].click)}},camera);
     for(const e of extras)poseExtra(e,1-Math.pow(1-beat(u,...e.seat),3));
