@@ -321,7 +321,11 @@ function runStory() {
     const la = Math.max(windowed(local(p, "strands"), 0.36, 0.5, 0.76, 0.88),windowed(local(p,"bundle"),.48,.65,.85,.98));
     labelsEl.style.opacity = la.toFixed(3);
     labelsEl.style.visibility = la > 0.001 && anchors ? "visible" : "hidden";
-    const stacked = anchors && la > 0.001 && innerWidth < 760 ? stackStrandTags(anchors) : null;
+    // the phone label layout follows the product camera's framing: portrait screens (aspect < 0.9, as in
+    // scene.js) get the phone composition, so a portrait iPad (768 px and up) needs the phone labels too;
+    // the desktop flags overlapped there (iPad mini review)
+    const narrow = innerWidth < 760 || innerWidth / innerHeight < 0.9;
+    const stacked = anchors && la > 0.001 && narrow ? stackStrandTags(anchors) : null;
     if (anchors && la > 0.001) for (const id in labelEls) {
       const a = anchors[id];
       labelEls[id].style.visibility = a ? "visible" : "hidden";
@@ -356,7 +360,7 @@ function runStory() {
         el.style.setProperty('--pole',`${Math.max(12,48-dy).toFixed(1)}px`);
       }
       if(id.startsWith('bundle')) {
-        const index=Object.keys(bundlePaths).indexOf(id),phone=innerWidth<760;
+        const index=Object.keys(bundlePaths).indexOf(id),phone=narrow;
         const margin=phone?32:60,gap=phone?16:24,cols=phone?2:4;
         const width=Math.min(phone?180:200,(innerWidth-2*margin-gap*(cols-1))/cols);
         const x=phone?margin+(index%2)*(width+gap):margin+index*(innerWidth-2*margin-width)/3;
