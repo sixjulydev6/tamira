@@ -43,12 +43,17 @@ export class RoomPainter {
     const jobs = [];
     const get = (url, tries) => fetch(url).then((r) => { if (!r.ok) throw new Error(`Room asset ${r.status}`); return r.blob(); })
       .catch((err) => { if (!this.alive || tries <= 1) throw err; return new Promise((ok) => setTimeout(ok, 800)).then(() => get(url, tries - 1)); });
-    this.g.levels.forEach((lv) => {
-      for (let s = 0; s <= this.beats.steps.length; s++) {
-        const key = `${lv.name}-${s}`;
-        jobs.push(get(this.url(lv.name, s), 4).then((b) => { if (this.alive) { this.blobs.set(key, b); this.pump(); } }).catch(() => {}));
-      }
-    });
+    // In the order they're needed: every level's first lighting step (the wide frame first), then each later
+    // step. Three at a time, so on a slow connection the first frames arrive first instead of all 24 together.
+    const queue = [];
+    for (let s = 0; s <= this.beats.steps.length; s++) this.g.levels.forEach((lv) => queue.push([lv.name, s]));
+    const next = () => {
+      const item = queue.shift();
+      if (!item || !this.alive) return Promise.resolve();
+      const [name, s] = item, key = `${name}-${s}`;
+      return get(this.url(name, s), 4).then((b) => { if (this.alive) { this.blobs.set(key, b); this.pump(); } }).catch(() => {}).then(next);
+    };
+    for (let i = 0; i < 3; i++) jobs.push(next());
     return Promise.all(jobs);
   }
 

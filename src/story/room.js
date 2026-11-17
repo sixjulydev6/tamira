@@ -10,7 +10,10 @@ export function createRoom(element) {
   function update(p) {
     if(!alive)return;
     const u=finaleU(p);lastU=u;
-    const near=local(p,'smoke')>.25||local(p,'finale')>0;
+    // Fetch the room's images from the first product chapter on (about ten screens ahead): fetched only from
+    // the smoke chapter, a slow connection (Slow 4G: ~4 s for the first frames) could be outrun by a quick
+    // scroll, and the story went from the board straight to the city with no room.
+    const near=local(p,'copper')>0;
     const f=frameFor(innerWidth/Math.max(1,innerHeight));
     if(near&&(!painter||frame!==f)) {
       painter?.dispose();frame=f;loading=true;
@@ -19,7 +22,7 @@ export function createRoom(element) {
       current.load().then(()=>{if(alive&&painter===current)loading=false;});
     }
     if(painter&&u>6.85)painter.paint(u);
-    else if(painter)painter.prime(6.99);   // decode the opening frames ahead, from the smoke chapter on
+    else if(painter&&(local(p,'smoke')>0||local(p,'finale')>0))painter.prime(6.99);   // decode the opening frames ahead (decoded images are memory: not before the smoke chapter)
     // Do not cover the matched live board with a blank canvas while images are decoding.
     const opacity=painter?.painted?smooth(6.99,7.06,u):0;
     element.style.opacity=String(opacity*(1-smooth(0,.07,local(p,'outro'))));
