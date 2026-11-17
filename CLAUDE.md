@@ -49,7 +49,7 @@ Lighting/post (`TUNE` in `skyline/index.js`, `atmosphere.js`) is tuned separatel
 
 ## Touch scroll pacing (2026-11-17, review feedback: "lag in between, then suddenly too fast or too slow")
 
-- Lenis now smooths touch too (`syncTouch: true, syncTouchLerp: 0.07, touchInertiaExponent: 1.5` in `main.js`): native momentum plus frame dips made the story lurch.
+- Lenis now smooths touch too (`syncTouch` in `main.js`): native momentum plus frame dips made the story lurch. Then made faster at the user's direction: `touchMultiplier 1.6`, `wheelMultiplier 1.25`, `touchInertiaExponent 1.7`, `lerp 0.14` / `syncTouchLerp 0.1`, story `scrub 0.15` (was 0.3). Same swipe gets through the story in 21 swipes instead of 32 (iPad mini size). Story length/choreography unchanged.
 - `Wire.update` (`wire.js`) was most of each product-chapter frame (rebuilt ~60k vertices with Math.cos/sin every frame). Now: per-ring cos/sin tables, strand frames looked up once when there is no fan, and the rebuild is skipped when the path and shape params are unchanged (`setPath` also skips identical points). Frames identical to before (pixel diff). At 4x CPU, iPad mini size: frames over 33 ms per chapter dropped from 50-96 to 0-2 in bundle/drain/finale/room.
 - The switchboard stage is built and warmed (compile + off-screen draw) one step per paused frame in copper..smoke (`buildInPause` in `scene.js`), not on the scroll at smoke 0.25 (a 130-330 ms hitch). The old trigger stays as a fallback.
 - `scene.js` `resize()` is a no-op when the canvas size is unchanged (phone/tablet toolbars fire resize while scrolling; it reallocated every target); `applyQuality` forces it.

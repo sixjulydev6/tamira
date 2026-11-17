@@ -136,7 +136,10 @@ function runStory() {
      momentum plus frame-rate dips made the pacing lurch, slow then suddenly fast). syncTouch makes Lenis
      own the touch fling too, eased per frame by elapsed time, so the story moves at an even rate. Reduced
      motion never gets here (goStatic), so it keeps native scrolling. In-page anchors glide through Lenis. */
-  const lenis = new Lenis({ autoRaf: false, anchors: true, lerp: 0.1, syncTouch: true, syncTouchLerp: 0.07, touchInertiaExponent: 1.5 });
+  // Faster (2026-11-17, user direction "the entire website scroll should be fast"): each swipe/wheel step
+  // travels further (touchMultiplier 1.6, wheelMultiplier 1.25, fling exponent 1.7) and the smoothing
+  // catches up sooner (lerp 0.14, touch 0.1; was 0.1 / 0.07). Story length and choreography unchanged.
+  const lenis = new Lenis({ autoRaf: false, anchors: true, lerp: 0.14, wheelMultiplier: 1.25, syncTouch: true, syncTouchLerp: 0.1, touchMultiplier: 1.6, touchInertiaExponent: 1.7 });
   lenis.on("scroll", ScrollTrigger.update);
   const lenisRaf = (time) => lenis.raf(time * 1000);
   gsap.ticker.add(lenisRaf);
@@ -398,7 +401,7 @@ function runStory() {
   const master = gsap.timeline({
     defaults: { ease: "none" },
     onUpdate: () => render(state.p),
-    scrollTrigger: { id: "tamira-story", trigger: storyEl, start: "top top", end: "bottom bottom", scrub: 0.3 },   // Lenis already smooths the input; a short scrub only rounds off keyboard jumps
+    scrollTrigger: { id: "tamira-story", trigger: storyEl, start: "top top", end: "bottom bottom", scrub: 0.15 },   // Lenis already smooths the input; a short scrub only rounds off keyboard jumps
   });
   let elapsed = 0;
   for (const segment of SEGMENTS) {
