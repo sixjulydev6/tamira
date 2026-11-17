@@ -47,6 +47,15 @@ Lighting/post (`TUNE` in `skyline/index.js`, `atmosphere.js`) is tuned separatel
 - Room approach push-in (`rig.js`): starts at follow 0.62 (was 0.72) and interpolates distance on a log scale, so the cable grows evenly instead of ~5x in the last tenth. Portrait screens end it at 0.8 m (`CLOSE_PORTRAIT`, was 0.34; 0.46 still overfilled an iPad mini, landscape stays 0.34); the bundle orbit starts from the same `closeFor(portrait)`, so the hand-over has no seam.
 - Checked in headless Chrome at 744x1133 / 390x844 / 1440x900 with throttled CPU; not yet on a real iPad.
 
+## Touch scroll pacing (2026-11-17, review feedback: "lag in between, then suddenly too fast or too slow")
+
+- Lenis now smooths touch too (`syncTouch: true, syncTouchLerp: 0.07, touchInertiaExponent: 1.5` in `main.js`): native momentum plus frame dips made the story lurch.
+- `Wire.update` (`wire.js`) was most of each product-chapter frame (rebuilt ~60k vertices with Math.cos/sin every frame). Now: per-ring cos/sin tables, strand frames looked up once when there is no fan, and the rebuild is skipped when the path and shape params are unchanged (`setPath` also skips identical points). Frames identical to before (pixel diff). At 4x CPU, iPad mini size: frames over 33 ms per chapter dropped from 50-96 to 0-2 in bundle/drain/finale/room.
+- The switchboard stage is built and warmed (compile + off-screen draw) one step per paused frame in copper..smoke (`buildInPause` in `scene.js`), not on the scroll at smoke 0.25 (a 130-330 ms hitch). The old trigger stays as a fallback.
+- `scene.js` `resize()` is a no-op when the canvas size is unchanged (phone/tablet toolbars fire resize while scrolling; it reallocated every target); `applyQuality` forces it.
+- `room.js` reads the viewport shape on resize only and writes its styles only on change (it forced a layout every frame).
+- Measured in headless Chrome with touch gestures (`Input.synthesizeScrollGesture`), not on a real iPad.
+
 ## Historical direction to preserve after the product handover
 
 - Live clay city/camera rise and traffic in Three.js, warm orange wireframe, avenue power-up, continuous city-to-product handover.

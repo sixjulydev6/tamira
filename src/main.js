@@ -132,9 +132,11 @@ function runStory() {
   const room = (ROOM_MODE === "glb" ? createLiveRoom : createRoom)(document.querySelector(".room-finale"));
 
   /* Lenis smooth scroll, driven by GSAP's ticker so ScrollTrigger and the story render on the same
-     frame. Wheel and trackpad are smoothed; touch keeps native momentum. Reduced motion never gets
-     here (goStatic), so it keeps native scrolling. In-page anchors glide through Lenis. */
-  const lenis = new Lenis({ autoRaf: false, anchors: true, lerp: 0.1 });
+     frame. Wheel, trackpad and touch are all smoothed (2026-11-17, review: on phones/iPad native
+     momentum plus frame-rate dips made the pacing lurch, slow then suddenly fast). syncTouch makes Lenis
+     own the touch fling too, eased per frame by elapsed time, so the story moves at an even rate. Reduced
+     motion never gets here (goStatic), so it keeps native scrolling. In-page anchors glide through Lenis. */
+  const lenis = new Lenis({ autoRaf: false, anchors: true, lerp: 0.1, syncTouch: true, syncTouchLerp: 0.07, touchInertiaExponent: 1.5 });
   lenis.on("scroll", ScrollTrigger.update);
   const lenisRaf = (time) => lenis.raf(time * 1000);
   gsap.ticker.add(lenisRaf);

@@ -7,6 +7,14 @@ import { local, smooth } from './timeline.js';
 export function createRoom(element) {
   const canvas=element.querySelector('canvas');
   let painter=null,frame=null,loading=false,alive=true,lastU=6.06;
+  // Runs every frame: the viewport shape is read on resize only (reading innerWidth after the story's style
+  // writes forced a layout every frame), and styles are written only when they change.
+  let aspect=innerWidth/Math.max(1,innerHeight);
+  const onResize=()=>{aspect=innerWidth/Math.max(1,innerHeight);};
+  addEventListener('resize',onResize);
+  const written={};
+  const put=(k,v)=>{if(written[k]===v)return;written[k]=v;if(k==='frame')element.dataset.frame=v;else element.style.setProperty(k,v);};
+  put('--room-end','0');   // no fade to black: the outro crossfades from the lit room to the city (user direction)
   function update(p) {
     if(!alive)return;
     const u=finaleU(p);lastU=u;
@@ -14,7 +22,7 @@ export function createRoom(element) {
     // the smoke chapter, a slow connection (Slow 4G: ~4 s for the first frames) could be outrun by a quick
     // scroll, and the story went from the board straight to the city with no room.
     const near=local(p,'copper')>0;
-    const f=frameFor(innerWidth/Math.max(1,innerHeight));
+    const f=frameFor(aspect);
     if(near&&(!painter||frame!==f)) {
       painter?.dispose();frame=f;loading=true;
       painter=new RoomPainter(canvas,ROOM_VIEW[f],(name,i)=>`/room/${name}-${i}.webp`,ROOM_BEATS,f==='p'?2.5:1.25);
@@ -25,10 +33,9 @@ export function createRoom(element) {
     else if(painter&&(local(p,'smoke')>0||local(p,'finale')>0))painter.prime(6.99);   // decode the opening frames ahead (decoded images are memory: not before the smoke chapter)
     // Do not cover the matched live board with a blank canvas while images are decoding.
     const opacity=painter?.painted?smooth(6.99,7.06,u):0;
-    element.style.opacity=String(opacity*(1-smooth(0,.07,local(p,'outro'))));
-    element.style.visibility=opacity>0&&local(p,'outro')<.07?'visible':'hidden';
-    element.style.setProperty('--room-end','0'); // no fade to black: the outro crossfades from the lit room to the city (user direction)
-    element.dataset.frame=f;
+    put('opacity',String(opacity*(1-smooth(0,.07,local(p,'outro')))));
+    put('visibility',opacity>0&&local(p,'outro')<.07?'visible':'hidden');
+    put('frame',f);
   }
-  return { update, diagnostics:()=>({frame,loading,u:lastU,painted:!!painter?.painted,stats:painter?.stats,decoded:painter?[...painter.bmps.keys()]:[]}), dispose(){alive=false;painter?.dispose();element.style.opacity='0';element.style.visibility='hidden';} };
+  return { update, diagnostics:()=>({frame,loading,u:lastU,painted:!!painter?.painted,stats:painter?.stats,decoded:painter?[...painter.bmps.keys()]:[]}), dispose(){alive=false;removeEventListener('resize',onResize);painter?.dispose();element.style.opacity='0';element.style.visibility='hidden';} };
 }

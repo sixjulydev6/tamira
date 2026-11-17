@@ -76,8 +76,13 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     const y = portrait ? ny * 0.5 - 0.32 : ny;     // keep the wire below the copy on tall screens
     return new THREE.Vector3(nx * halfW, y * halfH, 0);
   };
-  function resize() {
+  // force: a pixel-ratio change (applyQuality). Otherwise an unchanged canvas size is a no-op: phone and
+  // tablet browsers fire resize whenever their toolbars slide in or out while scrolling, and reallocating
+  // both drawing buffers and the composer's targets there stalled the scroll (the stage is 100lvh, so the
+  // canvas itself does not change size).
+  function resize(force) {
     const r = canvas.getBoundingClientRect();
+    if (!force && Math.max(1, r.width) === W && Math.max(1, r.height) === H) return;
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     renderer.setSize(W, H, false);
     wireRenderer.setSize(W, H, false);
@@ -220,7 +225,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       if(local(p,'bundle')>0&&local(p,'drain')===0)out.anchors=skyline.bundleAnchors();
     }
     const finale = local(p, "finale");
-    if (!finaleStage && (local(p, "smoke") > .25 || finale > 0)) finaleStage = createFinaleStage(wireRenderer, wireScene, wire);
+    if (!finaleStage && (local(p, "smoke") > .25 || finale > 0)) buildFinale();   // fallback: not built in a pause yet
     if (outro > 0) {
       finaleStage?.hide();                       // the room covers the board until the city is back
     } else if (showWire && finale > 0) {
@@ -248,6 +253,32 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
       };
     }
     return out;
+  }
+
+  /* The switchboard stage (board, wall, N and E wires) is built and drawn once off screen during a
+     reading pause in the product chapters, so its shader compiles and uploads (100-300 ms on a tablet)
+     never land mid-scroll; building it on the scroll at smoke 0.25 showed as a hitch, then a jump. */
+  // One step per paused frame (build, then each warm-up shot), so no single frame carries all of it.
+  const WARM_U = [6.2, 6.62];                  // the bridge, then the board with N and E both moving
+  let warmed = 0;
+  function buildFinale() { finaleStage = createFinaleStage(wireRenderer, wireScene, wire); }
+  function warmFinale(u) {
+    const rt = new THREE.WebGLRenderTarget(2, 2);
+    wireRenderer.toneMapping = THREE.NeutralToneMapping;
+    wireState(progressOf('smoke', 1));
+    const stage = finaleStage.update(u, W, H, wireCam, shapeWorld.wave);
+    wireRenderer.compile(stage.scene, stage.camera);                                   // screen variants (tone mapping)
+    wireRenderer.setRenderTarget(rt); wireRenderer.render(stage.scene, stage.camera);   // geometry/texture uploads
+    wireRenderer.setRenderTarget(null); rt.dispose();
+    finaleStage.hide();
+    wireState(lastProgress);                   // the canvas is untouched; the next update redraws from here
+  }
+  let pauseP = -1, pauseFrames = 0;
+  function buildInPause() {
+    pauseFrames = lastProgress === pauseP ? pauseFrames + 1 : 0; pauseP = lastProgress;
+    if (warmed >= WARM_U.length || pauseFrames < 6 || local(lastProgress, "copper") === 0 || local(lastProgress, "finale") > 0) return;
+    if (!finaleStage) buildFinale(); else warmFinale(WARM_U[warmed++]);
+    pauseFrames = 3;                           // next step a few frames later, if still paused
   }
 
   // compile everything up front so the first visible frame never stalls
@@ -286,7 +317,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
   function applyQuality() {
     renderer.setPixelRatio(qualityRatio());
     skyline.setMSAA(QUALITY[qualityMode].msaa);
-    resize();
+    resize(true);
     update(lastProgress, { bg: lastBgColor });   // resizing clears the canvas: redraw now, or that frame shows blank
     if (local(lastProgress, "wireIn") < .5 || local(lastProgress, "outro") > 0) skyline.render();
     frames = 0; slowFrames = 0;
@@ -317,6 +348,7 @@ export function createStory({ canvas, wireCanvas, stage, media }) {
     get progress() { return skyline.progress; },
     get error() { return skyline.error; },
     tick(delta) {
+      if (!disposed) buildInPause();
       if (disposed || (local(lastProgress, "wireIn") >= .5 && local(lastProgress, "outro") === 0) || document.hidden) return;
       skyline.tick(delta);
       watchFrame(delta);

@@ -35,6 +35,10 @@ export class Wire {
     // detail < 1: fewer rings/sides (the bundle's blue/green cores: small on screen, rebuilt every frame of the reveal)
     this.jSeg = Math.round(JACKET_SEG * detail); this.jRad = Math.max(12, Math.round(JACKET_RAD * detail));
     this.sSeg = Math.round(STRAND_SEG * detail); this.sRad = Math.max(6, Math.round(STRAND_RAD * detail));
+    // cos/sin of each ring's sides, once (the rebuild below ran ~60k Math.cos/sin pairs a frame)
+    const ring = (n) => ({ c: Float32Array.from({ length: n + 1 }, (_, j) => Math.cos((j / n) * Math.PI * 2)), s: Float32Array.from({ length: n + 1 }, (_, j) => Math.sin((j / n) * Math.PI * 2)) });
+    this.jRing = ring(this.jRad); this.sRing = ring(this.sRad);
+    this.lastPath = null; this.built = null;   // skip work when nothing changed
     this.group = new THREE.Group();
     this.samples = null;
     this.length = 1;
@@ -80,6 +84,14 @@ export class Wire {
   /** points: THREE.Vector3[] control points, in order from tail to tip.
       facing: the side the printed legend should face (default +Z, toward the product camera). */
   setPath(points, facing = UP_Z) {
+    // the same control points as last time (a paused scroll, the scene re-posing an unchanged wire): keep the samples
+    const key = this.lastPath, n = points.length * 3 + 3;
+    if (key && key.length === n && key[n - 3] === facing.x && key[n - 2] === facing.y && key[n - 1] === facing.z
+      && points.every((q, i) => key[i * 3] === q.x && key[i * 3 + 1] === q.y && key[i * 3 + 2] === q.z)) return;
+    const next = new Float64Array(n);
+    points.forEach((q, i) => { next[i * 3] = q.x; next[i * 3 + 1] = q.y; next[i * 3 + 2] = q.z; });
+    next[n - 3] = facing.x; next[n - 2] = facing.y; next[n - 1] = facing.z;
+    this.lastPath = next;
     const curve = new THREE.CatmullRomCurve3(points, false, "centripetal", 0.5);
     const pts = curve.getSpacedPoints(SAMPLES);
     this.length = curve.getLength();
@@ -123,6 +135,11 @@ export class Wire {
     if (!this.samples) return;
     const P = this.params;
     const head = this.headDist, jEnd = this.jacketEnd;
+    // geometry depends only on the path and these params; the uniforms below are cheap and always set
+    const b = this.built;
+    if (b && b.samples === this.samples && b.head === P.head && b.strip === P.strip && b.fan === P.fan && b.twist === P.twist && b.tailLen === P.tailLen) { this.setUniforms(head); return; }
+    this.built = { samples: this.samples, head: P.head, strip: P.strip, fan: P.fan, twist: P.twist, tailLen: P.tailLen };
+    const JC = this.jRing.c, JS = this.jRing.s, SC = this.sRing.c, SS = this.sRing.s;
     const tail = head - (P.tailLen ?? this.length + 30);    // long enough to run off-screen behind
     const fr = tmpFrame();
     const JACKET_SEG = this.jSeg, JACKET_RAD = this.jRad, STRAND_SEG = this.sSeg, STRAND_RAD = this.sRad;
@@ -135,7 +152,7 @@ export class Wire {
         const d = jEnd - (jEnd - tail) * Math.pow(1 - i / JACKET_SEG, 2.2);
         this.frameAt(d, fr);
         for (let j = 0; j <= JACKET_RAD; j++) {
-          const a = (j / JACKET_RAD) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+          const c = JC[j], s = JS[j];
           const nx = fr.n.x * c + fr.b.x * s, ny = fr.n.y * c + fr.b.y * s, nz = fr.n.z * c + fr.b.z * s;
           pos[v * 3] = fr.p.x + nx * R_JACKET; pos[v * 3 + 1] = fr.p.y + ny * R_JACKET; pos[v * 3 + 2] = fr.p.z + nz * R_JACKET;
           nor[v * 3] = nx; nor[v * 3 + 1] = ny; nor[v * 3 + 2] = nz;
@@ -157,7 +174,14 @@ export class Wire {
     {
       const pos = this.strandGeo.attributes.position.array, nor = this.strandGeo.attributes.normal.array;
       let v = 0;
+      const frS = fr;
       const coreTail = Math.max(tail, jEnd - 30);   // strands only need to exist near where they show
+      // with no fan every strand samples the same distances: look each frame up once, not once per strand
+      let shared = null;
+      if (P.fan === 0) {
+        shared = (this.sFrames ||= Array.from({ length: STRAND_SEG + 1 }, () => ({ p: new THREE.Vector3(), t: new THREE.Vector3(), n: new THREE.Vector3(), b: new THREE.Vector3() })));
+        for (let i = 0; i <= STRAND_SEG; i++) this.frameAt(coreTail + (head - coreTail) * (i / STRAND_SEG), shared[i]);
+      }
       for (let s = 0; s < STRAND_LAYOUT.length; s++) {
         const [ox0, oy0] = STRAND_LAYOUT[s];
         const rs = STRAND_LOOK[s].r;
@@ -166,7 +190,7 @@ export class Wire {
         let cx = 0, cy = 0, cz = 0;
         for (let i = 0; i <= STRAND_SEG; i++) {
           const d = coreTail + (head - coreTail) * (i / STRAND_SEG) - (s === 0 ? 0 : rnd * 0.35 * P.fan);
-          this.frameAt(d, fr);
+          const fr = shared ? shared[i] : this.frameAt(d, frS);
           const past = Math.max(0, (d - jEnd) / Math.max(0.01, P.strip));   // 0 inside the jacket, 1 at the tip
           const spread = 1 + P.fan * Math.pow(past, 1.5) * (1.4 + rnd * 1.2);
           // twist measured from the tip, so wires on different paths look identical at the tip
@@ -174,16 +198,17 @@ export class Wire {
           const ox = Math.cos(a) * r0 * R_CORE * spread, oy = Math.sin(a) * r0 * R_CORE * spread;
           cx = fr.p.x + fr.n.x * ox + fr.b.x * oy; cy = fr.p.y + fr.n.y * ox + fr.b.y * oy; cz = fr.p.z + fr.n.z * ox + fr.b.z * oy;
           for (let j = 0; j <= STRAND_RAD; j++) {
-            const q = (j / STRAND_RAD) * Math.PI * 2, c = Math.cos(q), sn = Math.sin(q);
+            const c = SC[j], sn = SS[j];
             const nx = fr.n.x * c + fr.b.x * sn, ny = fr.n.y * c + fr.b.y * sn, nz = fr.n.z * c + fr.b.z * sn;
             pos[v * 3] = cx + nx * rs; pos[v * 3 + 1] = cy + ny * rs; pos[v * 3 + 2] = cz + nz * rs;
             nor[v * 3] = nx; nor[v * 3 + 1] = ny; nor[v * 3 + 2] = nz;
             v++;
           }
         }
-        // the cut end: a solid, slightly domed copper face (fr is still the tip frame)
+        // the cut end: a solid, slightly domed copper face, on the tip frame
+        const fr = shared ? shared[STRAND_SEG] : frS;
         for (let j = 0; j <= STRAND_RAD; j++) {
-          const q = (j / STRAND_RAD) * Math.PI * 2, c = Math.cos(q), sn = Math.sin(q);
+          const c = SC[j], sn = SS[j];
           const nx = fr.n.x * c + fr.b.x * sn, ny = fr.n.y * c + fr.b.y * sn, nz = fr.n.z * c + fr.b.z * sn;
           pos[v * 3] = cx + nx * rs; pos[v * 3 + 1] = cy + ny * rs; pos[v * 3 + 2] = cz + nz * rs;
           nor[v * 3] = fr.t.x * 0.8 + nx * 0.6; nor[v * 3 + 1] = fr.t.y * 0.8 + ny * 0.6; nor[v * 3 + 2] = fr.t.z * 0.8 + nz * 0.6;
@@ -197,7 +222,11 @@ export class Wire {
       this.strandGeo.attributes.normal.needsUpdate = true;
     }
 
-    const U = this.jacketUniforms;
+    this.setUniforms(head);
+  }
+
+  setUniforms(head) {
+    const P = this.params, U = this.jacketUniforms;
     // cutaway window, measured in legend-uv units (distance back from the tip / TEXT_REPEAT)
     U.uCut.value = P.cut;
     // cutAt / heatAt / charAt are arc distances along the path (world units)
